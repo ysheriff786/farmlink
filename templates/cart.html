@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Cart - FarmLink{% endblock %}
+{% block content %}
+<h2>Your Cart</h2>
+{% if items %}
+<table class="table">
+  <thead>
+    <tr><th>Product</th><th>Farmer</th><th>Price</th><th>Qty</th><th>Subtotal</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for i in items %}
+    <tr>
+      <td>{{ i.name }}</td>
+      <td>{{ i.farmer_name }}</td>
+      <td>{{ i.price|money }} / {{ i.unit }}</td>
+      <td>{{ i.quantity }}</td>
+      <td>{{ (i.price * i.quantity)|money }}</td>
+      <td>
+        <form method="post" action="{{ url_for('cart_remove', item_id=i.item_id) }}">
+          <button class="btn small danger" type="submit">Remove</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr>
+      <td colspan="4"><strong>Total</strong></td>
+      <td colspan="2"><strong>{{ total|money }}</strong></td>
+    </tr>
+  </tfoot>
+</table>
+<a class="btn full" href="{{ url_for('checkout') }}">Proceed to Checkout</a>
+{% else %}
+<p class="muted">Your cart is empty. <a href="{{ url_for('products') }}">Browse products</a></p>
+{% endif %}
+{% endblock %}

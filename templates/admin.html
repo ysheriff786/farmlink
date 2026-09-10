@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Admin - FarmLink{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h2>Admin Dashboard</h2>
+</div>
+
+<div class="stats">
+  <div class="stat"><span class="stat-num">{{ stats.users }}</span><span>Users</span></div>
+  <div class="stat"><span class="stat-num">{{ stats.farmers }}</span><span>Farmers</span></div>
+  <div class="stat"><span class="stat-num">{{ stats.fpos }}</span><span>FPOs</span></div>
+  <div class="stat"><span class="stat-num">{{ stats.bulk_buyers }}</span><span>Bulk buyers</span></div>
+  <div class="stat"><span class="stat-num">{{ stats.customers }}</span><span>Customers</span></div>
+  <div class="stat"><span class="stat-num">{{ stats.products }}</span><span>Products</span></div>
+  <div class="stat"><span class="stat-num">{{ stats.orders }}</span><span>Active orders</span></div>
+  <div class="stat"><span class="stat-num {{ 'stats-alert' if stats.pending_verif else '' }}">{{ stats.pending_verif }}</span><span>Pending verification</span></div>
+  <div class="stat"><span class="stat-num">{{ stats.revenue|money }}</span><span>Revenue</span></div>
+</div>
+
+<div class="page-head">
+  <h3>Must-verify accounts</h3>
+</div>
+<div class="dash-grid">
+  <div class="card panel">
+    <h4>FPO verification</h4>
+    {% if fpos %}
+    <table class="table plain-table">
+      <tr><th>Org</th><th>Reg ID</th><th>Members</th><th>City</th><th>Status</th><th></th></tr>
+      {% for f in fpos %}
+      <tr>
+        <td>{{ f.name }}<br><span class="muted small">{{ f.email }}</span></td>
+        <td>{{ f.registration_id or '-' }}</td>
+        <td>{{ f.member_count or 0 }}</td>
+        <td>{{ f.city or '-' }}</td>
+        <td><span class="status-badge {{ f.verification_status|verif_class }}">{{ f.verification_status }}</span></td>
+        <td class="row-actions">
+          {% if f.verification_status != 'verified' %}
+          <form method="post" action="{{ url_for('admin_verify', kind='fpo', uid=f.id, verb='verify') }}">
+            <button class="btn small" type="submit">Verify</button>
+          </form>
+          {% endif %}
+          {% if f.verification_status != 'rejected' %}
+          <form method="post" action="{{ url_for('admin_verify', kind='fpo', uid=f.id, verb='reject') }}">
+            <button class="btn small danger" type="submit">Reject</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted">No FPO accounts yet.</p>
+    {% endif %}
+  </div>
+  <div class="card panel">
+    <h4>Bulk buyer verification</h4>
+    {% if bulks %}
+    <table class="table plain-table">
+      <tr><th>Org</th><th>Type</th><th>City</th><th>Status</th><th></th></tr>
+      {% for b in bulks %}
+      <tr>
+        <td>{{ b.name }}<br><span class="muted small">{{ b.email }}</span></td>
+        <td>{{ b.buyer_type }}</td>
+        <td>{{ b.city or '-' }}</td>
+        <td><span class="status-badge {{ b.verification_status|verif_class }}">{{ b.verification_status }}</span></td>
+        <td class="row-actions">
+          {% if b.verification_status != 'verified' %}
+          <form method="post" action="{{ url_for('admin_verify', kind='bulk', uid=b.id, verb='verify') }}">
+            <button class="btn small" type="submit">Verify</button>
+          </form>
+          {% endif %}
+          {% if b.verification_status != 'rejected' %}
+          <form method="post" action="{{ url_for('admin_verify', kind='bulk', uid=b.id, verb='reject') }}">
+            <button class="btn small danger" type="submit">Reject</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted">No bulk buyer accounts yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="page-head">
+  <h3>Recent orders</h3>
+</div>
+<table class="table">
+  <thead><tr><th>#</th><th>Buyer</th><th>Total</th><th>Payment</th><th>Status</th><th>Date</th></tr></thead>
+  <tbody>
+    {% for o in recent %}
+    <tr>
+      <td>#{{ o.id }}</td>
+      <td>{{ o.buyer_name }}</td>
+      <td>{{ o.total|money }}</td>
+      <td>{{ o.payment_method }}{% if o.payment_id %} (paid){% endif %}</td>
+      <td><span class="status-badge {{ o.status|status_class }}">{{ o.status }}</span></td>
+      <td>{{ o.created_at|datefmt }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="muted">No orders yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="page-head">
+  <h3>All products</h3>
+</div>
+<table class="table">
+  <thead><tr><th>Product</th><th>Farmer</th><th>Price</th><th>Stock</th><th></th></tr></thead>
+  <tbody>
+    {% for p in products %}
+    <tr>
+      <td>{{ p.name }}</td>
+      <td>{{ p.farmer_name }}</td>
+      <td>{{ p.price|money }} / {{ p.unit }}</td>
+      <td>{{ p.stock }}</td>
+      <td>
+        <form method="post" action="{{ url_for('admin_product_delete', pid=p.id) }}"
+              onsubmit="return confirm('Delete this product?')">
+          <button class="btn small danger" type="submit">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="page-head">
+  <h3>All users</h3>
+</div>
+<table class="table">
+  <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Phone</th><th>Joined</th></tr></thead>
+  <tbody>
+    {% for u in users %}
+    <tr>
+      <td>{{ u.name }}</td>
+      <td>{{ u.email }}</td>
+      <td><span class="badge {{ u.role }}">{{ u.role }}</span></td>
+      <td>{{ u.phone or '-' }}</td>
+      <td>{{ u.created_at|datefmt if u.created_at else '-' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

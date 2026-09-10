@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Pay Order #{{ order.id }} - FarmLink{% endblock %}
+{% block content %}
+<div class="form-card">
+  <h2>Complete your payment</h2>
+  <p>Order <strong>#{{ order.id }}</strong></p>
+  <p class="price">{{ order.total|money }}</p>
+  <p class="muted small">Paying via UPI, card or netbanking through Razorpay.</p>
+
+  <form id="payform" method="post" action="{{ url_for('pay_verify', oid=order.id) }}">
+    <input type="hidden" name="razorpay_payment_id" id="rzp_payment_id">
+    <input type="hidden" name="razorpay_order_id" id="rzp_order_id">
+    <input type="hidden" name="razorpay_signature" id="rzp_signature">
+  </form>
+
+  <button id="rzp-button" class="btn full" type="button">Pay {{ order.total|money }} now</button>
+  <a class="btn full outline" href="{{ url_for('orders') }}">Pay later</a>
+</div>
+
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+  var options = {
+    key: "{{ key_id }}",
+    amount: {{ (order.total * 100)|round|int }},
+    currency: "INR",
+    name: "FarmLink",
+    description: "Order #{{ order.id }}",
+    order_id: "{{ rzp_order_id }}",
+    handler: function (resp) {
+      document.getElementById("rzp_payment_id").value = resp.razorpay_payment_id;
+      document.getElementById("rzp_order_id").value = resp.razorpay_order_id;
+      document.getElementById("rzp_signature").value = resp.razorpay_signature;
+      document.getElementById("payform").submit();
+    },
+    theme: { color: "#2e7d32" }
+  };
+  var rzp = new Razorpay(options);
+  document.getElementById("rzp-button").onclick = function (e) { rzp.open(); };
+  window.onload = function () { rzp.open(); };
+</script>
+{% endblock %}

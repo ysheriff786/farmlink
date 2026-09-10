@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block title %}Orders - FarmLink{% endblock %}
+{% block content %}
+
+{% if current_user.role in ['farmer', 'fpo'] %}
+<div class="page-head">
+  <h2>Orders Received</h2>
+</div>
+
+{% if sold_groups %}
+{% for g in sold_groups %}
+<div class="card order-card live-order" data-oid="{{ g.order_id }}" data-status="{{ g.status }}">
+  <div class="order-head">
+    <strong>Order #{{ g.order_id }}</strong>
+    <span class="muted">{{ g.order_date|datefmt }}</span>
+    <span class="status-badge {{ g.status|status_class }}">{{ g.status }}</span>
+    <span class="order-total">{{ g.total|money }} &middot; {{ g.payment_method }}</span>
+  </div>
+  <div class="order-body">
+    <p class="buyer"><strong>{{ g.buyer_name }}</strong> &middot; {{ g.phone }}</p>
+    <p class="muted small">{{ g.address }}</p>
+    <ul class="order-items">
+      {% for line in g.lines %}
+      <li>{{ line.product_name }} x {{ line.quantity }} - {{ (line.price * line.quantity)|money }}</li>
+      {% endfor %}
+    </ul>
+
+    {% if g.status == 'Placed' %}
+    <div class="order-actions">
+      <form method="post" action="{{ url_for('order_status', oid=g.order_id) }}">
+        <input type="hidden" name="status" value="Confirmed">
+        <button class="btn small" type="submit">Confirm order</button>
+      </form>
+      <form method="post" action="{{ url_for('order_status', oid=g.order_id) }}"
+            onsubmit="return confirm('Cancel this order? Stock will be restored.')">
+        <input type="hidden" name="status" value="Cancelled">
+        <button class="btn small danger" type="submit">Cancel</button>
+      </form>
+    </div>
+    {% elif g.status == 'Confirmed' %}
+    <div class="order-actions">
+      <form method="post" action="{{ url_for('order_status', oid=g.order_id) }}">
+        <input type="hidden" name="status" value="Out for Delivery">
+        <button class="btn small" type="submit">🚚 Out for delivery</button>
+      </form>
+      <form method="post" action="{{ url_for('order_status', oid=g.order_id) }}"
+            onsubmit="return confirm('Cancel this order? Stock will be restored.')">
+        <input type="hidden" name="status" value="Cancelled">
+        <button class="btn small danger" type="submit">Cancel</button>
+      </form>
+    </div>
+    {% elif g.status == 'Out for Delivery' %}
+    <div class="otp-note">🔐 Ask the customer for their 6-digit delivery code:</div>
+    <div class="order-actions">
+      <form method="post" action="{{ url_for('order_status', oid=g.order_id) }}" class="otp-form">
+        <input type="hidden" name="status" value="Delivered">
+        <input class="otp-input" name="otp" placeholder="6-digit code"
+               pattern="\d{6}" maxlength="6" required autocomplete="one-time-code">
+        <button class="btn small" type="submit">✅ Verify &amp; mark delivered</button>
+      </form>
+    </div>
+    {% endif %}
+
+    {% include '_chat.html' %}
+  </div>
+</div>
+{% endfor %}
+{% else %}
+{% if has_products %}
+<p class="muted">No orders yet. Once customers buy your products, orders appear here.</p>
+{% else %}
+<p class="muted">You haven't listed any products yet. Customers can only order products you list — <a href="{{ url_for('product_new') }}">list your first product</a>.</p>
+{% endif %}
+{% endif %}
+
+{% else %}
+<div class="page-head">
+  <h2>My Orders</h2>
+</div>
+
+{% if orders %}
+{% for o in orders %}
+<div class="card order-card live-order" data-oid="{{ o.id }}" data-status="{{ o.status }}">
+  <div class="order-head">
+    <strong>Order #{{ o.id }}</strong>
+    <span class="muted">{{ o.created_at|datefmt }}</span>
+    <span class="status-badge {{ o.status|status_class }}">{{ o.status }}</span>
+    <span class="order-total">{{ o.total|money }} &middot;
+      {{ o.payment_method }}{% if o.payment_id %} (paid){% endif %}</span>
+  </div>
+  <div class="order-body">
+    <ul class="order-items">
+      {% for item in o.order_lines %}
+      <li>{{ item.product_name }} x {{ item.quantity }} - {{ (item.price * item.quantity)|money }}</li>
+      {% endfor %}
+    </ul>
+    <p class="muted small">Deliver to: {{ o.address }} &middot; {{ o.phone }}</p>
+
+    {% if o.status == 'Out for Delivery' and o.delivery_otp %}
+    <div class="otp-show">
+      <div>
+        <strong>Your delivery code</strong>
+        <div class="otp-code">{{ o.delivery_otp }}</div>
+        <small class="muted">Share this only when you receive the items.</small>
+      </div>
+    </div>
+    {% elif o.status == 'Out for Delivery' %}
+    <div class="otp-note">🔐 A delivery code will appear here shortly.</div>
+    {% endif %}
+
+    {% if current_user.role in ['customer', 'bulk_buyer'] and o.status in ('Pending Payment', 'Placed', 'Confirmed') %}
+    <div class="order-actions">
+      {% if o.status == 'Pending Payment' %}
+      <a class="btn small" href="{{ url_for('pay', oid=o.id) }}">Pay now / retry payment</a>
+      {% endif %}
+      <form method="post" action="{{ url_for('order_status', oid=o.id) }}"
+            onsubmit="return confirm('Cancel this order?')">
+        <input type="hidden" name="status" value="Cancelled">
+        <button class="btn small danger" type="submit">Cancel order</button>
+      </form>
+    </div>
+    {% endif %}
+
+    {% include '_chat.html' %}
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<p class="muted">You haven't placed any orders yet. <a href="{{ url_for('products') }}">Browse products</a></p>
+{% endif %}
+{% endif %}
+
+<p class="muted small live-note"><span class="live-dot"></span> Live: statuses and chats update automatically.</p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var baseStatusUrl = "{{ url_for('api_order_status', oid=0) }}";
+  var countsUrl = "{{ url_for('api_live_counts') }}";
+  var msgsUrlBase = "{{ url_for('api_messages', oid=0) }}";
+
+  document.querySelectorAll(".live-order").forEach(function (card) {
+    setInterval(function () {
+      fetch(baseStatusUrl.replace("/0/", "/" + card.dataset.oid + "/"))
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d || d.status === card.dataset.status) return;
+          var badge = card.querySelector(".status-badge");
+          badge.textContent = d.status;
+          badge.className = "status-badge " + ({ "Pending Payment": "warn", Placed: "info", Confirmed: "info",
+            "Out for Delivery": "progress", Delivered: "done", Cancelled: "bad" }[d.status] || "info");
+          if (!card.querySelector(".just-updated")) {
+            var note = document.createElement("span");
+            note.className = "just-updated";
+            note.textContent = " updated just now — refreshing…";
+            badge.after(note);
+            setTimeout(function () { location.reload(); }, 1500);
+          }
+        })
+        .catch(function () {});
+    }, 5000);
+  });
+
+  /* ---- per-order chat ---- */
+  function escTime(iso) {
+    return (iso || "").replace("T", " ").slice(5, 16);
+  }
+  document.querySelectorAll(".chat-toggle").forEach(function (btn) {
+    var oid = btn.dataset.oid;
+    var box = document.getElementById("chat-" + oid);
+    var list = box.querySelector(".chat-msgs");
+    var form = box.querySelector("form");
+    var input = box.querySelector(".chat-input");
+    var timer = null;
+
+    function bubble(m) {
+      var wrap = document.createElement("div");
+      wrap.className = "chat-bubble " + (m.mine ? "mine" : "theirs");
+      var who = document.createElement("span");
+      who.className = "chat-who";
+      who.textContent = m.sender_name + (m.mine ? " (you)" : "");
+      var txt = document.createElement("p");
+      txt.textContent = m.text;
+      var t = document.createElement("time");
+      t.textContent = escTime(m.created_at);
+      wrap.append(who, txt, t);
+      return wrap;
+    }
+
+    function scroll() { list.scrollTop = list.scrollHeight; }
+
+    function load() {
+      fetch(msgsUrlBase.replace("/0/", "/" + oid + "/"))
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d) return;
+          list.replaceChildren();
+          d.messages.forEach(function (m) { list.appendChild(bubble(m)); });
+          scroll();
+        }).catch(function () {});
+    }
+
+    btn.addEventListener("click", function () {
+      var open = box.hidden;
+      box.hidden = !open;
+      btn.classList.toggle("open", open);
+      if (open) { load(); timer = setInterval(load, 4000); }
+      else { clearInterval(timer); }
+    });
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var text = input.value.trim();
+      if (!text) return;
+      fetch(msgsUrlBase.replace("/0/", "/" + oid + "/"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text })
+      }).then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (res) {
+          if (res && res.ok) {
+            list.appendChild(bubble({ mine: true, sender_name: "", text: text,
+              created_at: res.created_at }));
+            input.value = "";
+            scroll();
+          }
+        }).catch(function () {});
+    });
+  });
+
+  {% if current_user.role in ['farmer', 'fpo'] %}
+  var lastNew = {{ new_orders }};
+  setInterval(function () {
+    fetch(countsUrl).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.new_orders > lastNew) {
+        lastNew = d.new_orders;
+        var t = document.createElement("div");
+        t.className = "flash success";
+        t.textContent = "🔔 You have a new order! Loading it now…";
+        document.querySelector(".container").prepend(t);
+        setTimeout(function () { location.reload(); }, 2000);
+      }
+    }).catch(function () {});
+  }, 6000);
+  {% endif %}
+</script>
+{% endblock %}

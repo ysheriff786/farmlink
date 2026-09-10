@@ -1,0 +1,29 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environment
+.venv/
+
+# Database files
+*.db
+*.db-*
+*.sqlite3
+
+# Logs
+*.log
+server_err.log
+
+# OS
+Thumbs.db
+.DS_Store
+
+# IDE
+.idea/
+.vscode/

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Logistics Admin - FarmLink{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h2>Logistics Management</h2>
+  <div class="head-actions">
+    <a class="btn small outline" href="{{ url_for('admin') }}">Admin Panel</a>
+  </div>
+</div>
+
+<div class="page-head">
+  <h3>Active Deliveries</h3>
+</div>
+<div class="card panel">
+  {% if deliveries %}
+  <div class="table-scroll">
+    <table class="table">
+      <tr><th>ID</th><th>Order</th><th>Logistics</th><th>Vehicle</th><th>Pickup</th><th>Dest</th><th>Status</th><th>Assigned</th></tr>
+      {% for d in deliveries %}
+      <tr>
+        <td>#{{ d.id }}</td>
+        <td>{% if d.order_id %}Order #{{ d.order_id }}{% elif d.bulk_order_id %}Bulk #{{ d.bulk_order_id }}{% else %}-{% endif %}</td>
+        <td>{{ d.logistics_company or '-' }}</td>
+        <td>{{ d.vehicle_type or '-' }} <small class="muted">{{ d.registration_number or '' }}</small></td>
+        <td>{{ d.pickup_city or '-' }}</td>
+        <td>{{ d.destination_city or '-' }}</td>
+        <td><span class="status-badge {{ d.status|status_class }}">{{ d.status }}</span></td>
+        <td>{{ d.created_at[:16] }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">No active deliveries.</p>
+  {% endif %}
+</div>
+
+<div class="page-head">
+  <h3>Logistics Partners</h3>
+</div>
+<div class="form-card" style="max-width:100%;">
+  <div class="table-scroll">
+    <table class="table">
+      <tr><th>Company</th><th>Contact</th><th>Phone</th><th>City</th><th>License</th><th>Status</th><th>Actions</th></tr>
+      {% for p in partners %}
+      <tr>
+        <td>{{ p.company_name or p.name }}</td>
+        <td>{{ p.contact_person or '-' }}</td>
+        <td>{{ p.phone or '-' }}</td>
+        <td>{{ p.city or '-' }}</td>
+        <td>{{ p.license_number or '-' }}</td>
+        <td><span class="status-badge {{ ('done' if p.verification_status == 'verified' else 'warn' if p.verification_status == 'pending' else 'bad') }}">{{ p.verification_status }}</span></td>
+        <td class="actions-cell">
+          <form method="post" action="{{ url_for('admin_logistics_verify', kind='logistics', uid=p.user_id, verb='verify') }}" class="inline-form">
+            <button class="btn small" type="submit">Verify</button>
+          </form>
+          <form method="post" action="{{ url_for('admin_logistics_verify', kind='logistics', uid=p.user_id, verb='reject') }}" class="inline-form">
+            <button class="btn small danger" type="submit">Reject</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="muted">No logistics partners registered yet.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+
+<style>
+  .actions-cell { display: flex; gap: 6px; }
+</style>
+{% endblock %}

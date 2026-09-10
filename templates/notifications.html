@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Notifications - FarmLink{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h2>Notifications</h2>
+</div>
+
+<div class="card panel">
+  {% if notifications %}
+  <div class="table-scroll">
+    <table class="table">
+      <tr><th>Type</th><th>Title</th><th>Message</th><th>Date</th></tr>
+      {% for n in notifications %}
+      <tr class="{{ '' if n.is_read else 'unread-notif' }}">
+        <td><span class="status-badge {{ n.type|status_class }}">{{ n.type }}</span></td>
+        <td>{{ n.title }}</td>
+        <td>{{ n.message }}</td>
+        <td>{{ n.created_at[:16] }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">No notifications yet. You'll see updates about orders, quotes, deliveries and alerts here.</p>
+  {% endif %}
+</div>
+
+<style>
+  .unread-notif { background: var(--accent-faint, #eef7ee); font-weight: 500; }
+</style>
+{% endblock %}

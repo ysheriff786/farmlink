@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} - FarmLink{% endblock %}
+{% block content %}
+<div class="card page-card">
+  <h2>{{ title }}</h2>
+  <div class="page-body">{{ body|safe }}</div>
+</div>
+{% endblock %}

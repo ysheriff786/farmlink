@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+{% block title %}Bulk Buyer Dashboard - FarmLink{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h2>Bulk Buyer Dashboard</h2>
+  <span class="muted">{{ current_user.name }} &middot; {{ profile.buyer_type }}</span>
+</div>
+
+{% if profile and profile.verification_status != 'verified' %}
+<div class="flash warn">
+  Your bulk buyer profile is <strong>{{ profile.verification_status }}</strong>. Admin verification must be
+  completed before you can place bulk orders.
+</div>
+{% endif %}
+
+<nav class="dash-tabs">
+  <a class="dash-tab {{ 'on' if tab == 'overview' }}" href="{{ url_for('bulk_dashboard', tab='overview') }}">Overview</a>
+  <a class="dash-tab {{ 'on' if tab == 'find' }}" href="{{ url_for('bulk_dashboard', tab='find') }}">Find suppliers</a>
+  <a class="dash-tab {{ 'on' if tab == 'create' }}" href="{{ url_for('bulk_dashboard', tab='create') }}">New request</a>
+  <a class="dash-tab {{ 'on' if tab == 'requests' }}" href="{{ url_for('bulk_dashboard', tab='requests') }}">My requests</a>
+  <a class="dash-tab {{ 'on' if tab == 'quotes' }}" href="{{ url_for('bulk_dashboard', tab='quotes') }}">Quotes ({{ stats.quotes }})</a>
+  <a class="dash-tab {{ 'on' if tab == 'orders' }}" href="{{ url_for('bulk_dashboard', tab='orders') }}">Bulk orders ({{ stats.active_orders }})</a>
+  <a class="dash-tab {{ 'on' if tab == 'profile' }}" href="{{ url_for('bulk_dashboard', tab='profile') }}">Profile</a>
+</nav>
+
+{% if tab == 'overview' %}
+<div class="stats dash-stats">
+  <div class="stat"><span class="stat-num">{{ stats.requirements }}</span><small>Active requests</small></div>
+  <div class="stat"><span class="stat-num">{{ stats.quotes }}</span><small>Quotes received</small></div>
+  <div class="stat"><span class="stat-num">{{ stats.active_orders }}</span><small>Active bulk orders</small></div>
+  <div class="stat"><span class="stat-num">{{ stats.fpos_verified }}</span><small>Verified FPOs</small></div>
+</div>
+<div class="dash-grid">
+  <div class="card panel">
+    <h3>How bulk buying works</h3>
+    <ul class="plain-list">
+      <li>1. Publish a <a href="{{ url_for('bulk_dashboard', tab='create') }}">bulk requirement</a> with the quantity you need.</li>
+      <li>2. <a href="{{ url_for('bulk_dashboard', tab='find') }}">Browse verified FPOs</a> and browse their products on the marketplace.</li>
+      <li>3. Review <a href="{{ url_for('bulk_dashboard', tab='quotes') }}">quotes</a> and accept the best one.</li>
+      <li>4. Track your <a href="{{ url_for('bulk_dashboard', tab='orders') }}">bulk orders</a> to completion.</li>
+    </ul>
+  </div>
+  <div class="card panel">
+    <h3>Verification</h3>
+    <p>Your profile status:
+       <span class="status-badge {{ profile.verification_status|verif_class }}">{{ profile.verification_status }}</span></p>
+    <p class="muted small">Verified buyers get priority. Contact
+       <a href="{{ url_for('page', slug='contact') }}">support</a> for onboarding help.</p>
+  </div>
+</div>
+
+{% elif tab == 'find' %}
+<div class="page-head">
+  <h3>Verified FPO suppliers</h3>
+</div>
+{% if fpos %}
+<div class="grid">
+  {% for f in fpos %}
+  <div class="card product-card">
+    <div class="card-body">
+      <h3>{{ f.name }}</h3>
+      <p class="muted small">{{ f.city or '-' }}{% if f.state %}, {{ f.state }}{% endif %} {{ f.pincode or '' }}</p>
+      <p class="muted small">{{ f.member_count or 0 }} farmer members</p>
+      {% if f.main_crops %}<p class="desc">{{ f.main_crops|truncate(90) }}</p>{% endif %}
+      {% if f.description %}<p class="muted small desc">{{ f.description|truncate(90) }}</p>{% endif %}
+      <p class="muted small">Contact: {{ f.contact_person or '-' }} · {{ f.phone or '-' }}</p>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="muted">No verified FPOs yet. Check back soon.</p>
+{% endif %}
+
+{% elif tab == 'create' %}
+<div class="card panel form-card-less">
+  <h3>Post a bulk requirement</h3>
+  <p class="muted small">Describe what you need and FPOs will send you quotes.</p>
+  <form method="post" action="{{ url_for('bulk_requirement_new') }}">
+    <label for="title">Requirement title <span class="req">*</span></label>
+    <input id="title" name="title" type="text" required maxlength="160"
+           placeholder="e.g. 200 kg of fresh tomatoes weekly">
+
+    <label for="description">Description</label>
+    <textarea id="description" name="description" rows="3" maxlength="600"></textarea>
+
+    <div class="fields-2">
+      <div>
+        <label for="quantity">Quantity <span class="req">*</span></label>
+        <input id="quantity" name="quantity" type="number" step="any" min="0.01" required>
+      </div>
+      <div>
+        <label for="unit">Unit</label>
+        <select id="unit" name="unit">
+          {% for u in units %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <label for="category">Category</label>
+    <select id="category" name="category">
+      {% for c in categories %}<option value="{{ c.name }}">{{ c.name }}</option>{% endfor %}
+    </select>
+
+    <label for="target_price">Target price per unit (₹, optional)</label>
+    <input id="target_price" name="target_price" type="number" step="0.01" min="0.01">
+
+    <div class="fields-2">
+      <div>
+        <label for="city">City</label>
+        <input id="city" name="city" type="text" maxlength="80">
+      </div>
+      <div>
+        <label for="pincode">Pincode</label>
+        <input id="pincode" name="pincode" type="text" pattern="[0-9]{6}" maxlength="10">
+      </div>
+    </div>
+
+    <button class="btn full" type="submit">Publish requirement</button>
+  </form>
+</div>
+
+{% elif tab == 'requests' %}
+<div class="page-head">
+  <h3>My bulk requests</h3>
+</div>
+{% if requirements %}
+<table class="table">
+  <thead><tr><th>#</th><th>Requirement</th><th>Qty</th><th>Quotes</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+    {% for r in requirements %}
+    <tr>
+      <td>#{{ r.id }}</td>
+      <td>{{ r.title }}<br><span class="muted small">{{ r.category }}</span></td>
+      <td>{{ r.quantity }} {{ r.unit }}</td>
+      <td>{{ r.quote_count }}</td>
+      <td><span class="status-badge {{ r.status|verif_class if r.status in ['Open','Awarded','Closed','Cancelled'] else 'info' }}">{{ r.status }}</span></td>
+      <td>
+        {% if r.status == 'Open' %}
+        <form method="post" action="{{ url_for('bulk_requirement_cancel', rid=r.id) }}"
+              onsubmit="return confirm('Cancel this requirement?')">
+          <button class="btn small danger" type="submit">Cancel</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">You haven't posted any requirements. <a href="{{ url_for('bulk_dashboard', tab='create') }}">Post one now</a>.</p>
+{% endif %}
+
+{% elif tab == 'quotes' %}
+<div class="page-head">
+  <h3>Quotes on your requirements</h3>
+</div>
+{% if quotes %}
+<table class="table">
+  <thead><tr><th>Requirement</th><th>FPO</th><th>Quote</th><th>Supply</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+    {% for q in quotes %}
+    <tr>
+      <td>{{ q.title }} ({{ q.req_qty }} {{ q.unit }})<br>
+          <span class="muted small">
+            {% if q.fulfill == 'full' %}Fulfills the full requirement{% else %}Covers {{ q.quantity }} of {{ q.req_qty }} {{ q.unit }}{% endif %}
+          </span></td>
+      <td>{{ q.fpo_name }}</td>
+      <td>{{ q.price|money }} x {{ q.quantity }} = {{ (q.price * q.quantity)|money }}
+        {% if q.notes %}<br><span class="muted small">{{ q.notes }}</span>{% endif %}</td>
+      <td>
+        {% if q.supply_name %}
+        <span class="status-badge info">Supply backed</span><br><span class="muted small">{{ q.supply_name }}</span>
+        {% else %}
+        <span class="muted small">No supply link</span>
+        {% endif %}
+      </td>
+      <td><span class="status-badge {{ q.status|status_class }}">{{ q.status }}</span></td>
+      <td>
+        {% if q.status == 'Pending' %}
+        <div class="row-actions">
+          <form method="post" action="{{ url_for('bulk_quote_respond', qid=q.id, verb='accept') }}"
+                onsubmit="return confirm('Accept this quote? A bulk order will be created.')">
+            <button class="btn small" type="submit">Accept</button>
+          </form>
+          <form method="post" action="{{ url_for('bulk_quote_respond', qid=q.id, verb='reject') }}">
+            <button class="btn small danger" type="submit">Reject</button>
+          </form>
+        </div>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No quotes yet. <a href="{{ url_for('bulk_dashboard', tab='create') }}">Post a requirement</a> to receive quotes.</p>
+{% endif %}
+
+{% elif tab == 'orders' %}
+<div class="page-head">
+  <h3>Bulk orders</h3>
+</div>
+{% if bulk_orders %}
+<table class="table">
+  <thead><tr><th>#</th><th>Requirement</th><th>FPO</th><th>Qty x Price</th><th>Total</th><th>Supply</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+    {% for b in bulk_orders %}
+    <tr>
+      <td>#{{ b.id }}</td>
+      <td>{{ b.title }}</td>
+      <td>{{ b.fpo_name }}</td>
+      <td>{{ b.quantity }} x {{ b.price|money }}</td>
+      <td>{{ b.total|money }}</td>
+      <td>{% if b.supply_name %}<span class="muted small">{{ b.supply_name }}</span>{% else %}<span class="muted small">-</span>{% endif %}</td>
+      <td><span class="status-badge {{ b.status|status_class }}">{{ b.status }}</span></td>
+      <td>
+        {% if b.status == 'Active' %}
+        <div class="row-actions">
+          <form method="post" action="{{ url_for('bulk_order_respond', oid=b.id, verb='complete') }}">
+            <button class="btn small" type="submit">Mark complete</button>
+          </form>
+          <form method="post" action="{{ url_for('bulk_order_respond', oid=b.id, verb='cancel') }}"
+                onsubmit="return confirm('Cancel this bulk order?')">
+            <button class="btn small danger" type="submit">Cancel</button>
+          </form>
+        </div>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No bulk orders yet.</p>
+{% endif %}
+
+{% elif tab == 'profile' %}
+<div class="card panel profile-card">
+  <h3>Buyer profile
+    <span class="status-badge {{ profile.verification_status|verif_class }}">{{ profile.verification_status }}</span>
+  </h3>
+  <p><strong>Organisation:</strong> {{ current_user.name }}</p>
+  <p><strong>Buyer type:</strong> {{ profile.buyer_type }}</p>
+  <p><strong>Contact person:</strong> {{ profile.contact_person or '-' }} · {{ profile.phone or '-' }}</p>
+  <p><strong>Location:</strong> {{ profile.address or '-' }}, {{ profile.city or '-' }}, {{ profile.state or '-' }} {{ profile.pincode or '' }}</p>
+</div>
+{% endif %}
+{% endblock %}

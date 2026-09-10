@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Demand Analytics & Forecasts - FarmLink{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h2>Demand Analytics & Forecasts</h2>
+  <div class="head-actions">
+    <a class="btn small outline" href="{{ url_for('admin_intelligence') }}">Intelligence Center</a>
+    <a class="btn small outline" href="{{ url_for('admin') }}">Admin Panel</a>
+  </div>
+</div>
+
+<div class="stats dash-stats">
+  <div class="stat"><span class="stat-num">{{ '%.1f'|format(analytics.total_demand_7d) }}</span><small>Total demand (7d)</small></div>
+  <div class="stat"><span class="stat-num">{{ '%.1f'|format(analytics.total_demand_30d) }}</span><small>Total demand (30d)</small></div>
+  <div class="stat"><span class="stat-num">{{ analytics.total_products }}</span><small>Products tracked</small></div>
+  <div class="stat">
+    <span class="stat-num {% if analytics.demo_mode %}warn{% endif %}">{{ 'Demo' if analytics.demo_mode else 'Live' }}</span>
+    <small>Data mode</small>
+  </div>
+</div>
+
+<div class="card panel">
+  <h3>Product demand vs forecast</h3>
+  {% if analytics.products %}
+  <div class="table-scroll">
+    <table class="table">
+      <tr>
+        <th>Product</th>
+        <th>Demand 7d</th>
+        <th>Demand 30d</th>
+        <th>Daily avg</th>
+        <th>Forecast 7d</th>
+        <th>Trend</th>
+        <th>Data days</th>
+      </tr>
+      {% for p in analytics.products %}
+      <tr>
+        <td>{{ p.name }}</td>
+        <td>{{ '%.1f'|format(p.demand_7d) }}</td>
+        <td>{{ '%.1f'|format(p.demand_30d) }}</td>
+        <td>{{ '%.1f'|format(p.daily_avg) }}</td>
+        <td>{{ '%.1f'|format(p.forecast_7d) }}</td>
+        <td><span class="status-badge {{ 'done' if p.trend == 'Increasing' else 'bad' if p.trend == 'Decreasing' else 'info' }}">{{ p.trend }}</span></td>
+        <td>{{ p.data_days }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">Insufficient historical data for reliable forecasts.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name }} - FarmLink{% endblock %}
+{% block content %}
+{% set discount = ((1 - product.price / product.mrp) * 100)|round|int if product.mrp and product.mrp > product.price else 0 %}
+
+<div class="detail-grid card">
+  <div class="detail-img">
+    {% if product.image %}
+      <img src="{{ url_for('static', filename='uploads/' ~ product.image) }}" alt="{{ product.name }}">
+    {% else %}
+      <span>{{ product.name[0]|upper }}</span>
+    {% endif %}
+    {% if discount %}<span class="save-badge">Save {{ discount }}%</span>{% endif %}
+    {% if product.stock <= 0 %}<span class="out-badge">Out of stock</span>{% endif %}
+  </div>
+  <div class="detail-info">
+    <p class="muted small">Sold by <strong>{{ product.farmer_name }}</strong>
+      {% if product.is_aggregate %}
+      <span class="badge aggregate">FPO supply — pooled from member farmers</span>
+      {% endif %}
+    </p>
+
+    <h2>{{ product.name }}</h2>
+
+    <p class="stars">★★★★★
+      <span style="color:var(--muted)">{{ '%.1f'|format(product.avg_rating) }} · {{ product.review_count }} review{{ '' if product.review_count == 1 else 's' }}</span>
+    </p>
+
+    <p class="price big">
+      {{ product.price|money }} <small>/ {{ product.unit }}</small>
+      {% if product.mrp and product.mrp > product.price %}
+        <s class="mrp">{{ product.mrp|money }}</s>
+      {% endif %}
+    </p>
+
+    <p class="{{ 'stock-in' if product.stock > 0 else 'stock-out' }}">
+      {% if product.stock > 0 %}✅ In stock: {{ product.stock }} {{ product.unit }}{% else %}❌ Currently unavailable{% endif %}
+    </p>
+    {% if product.is_aggregate %}
+    <p class="muted small">Aggregated from your local farmer collective. On-hand reflects each member's
+       remaining committed stock, so what you see is what they can actually supply.</p>
+    {% endif %}
+
+    {% if product.description %}<p class="desc">{{ product.description }}</p>{% endif %}
+
+    {% if current_user and current_user.role in ['customer', 'bulk_buyer'] and product.stock > 0 %}
+    <form class="add-form" method="post" action="{{ url_for('cart_add', pid=product.id) }}">
+      <input type="number" name="quantity" value="{{ product.min_qty if product.min_qty and product.min_qty > 1 else 1 }}" min="{{ product.min_qty|int }}" max="{{ product.stock }}">
+      <button class="btn" type="submit">🛒 Add to Cart</button>
+    </form>
+    {% elif not current_user %}
+      <a class="btn" href="{{ url_for('login', next=request.path) }}">Login to order</a>
+    {% endif %}
+
+    {% if current_user and current_user.role in ['farmer', 'fpo'] and current_user.id == product.farmer_id %}
+    <div class="owner-actions">
+      <a class="btn small outline" href="{{ url_for('product_edit', pid=product.id) }}">✏️ Edit</a>
+      <form method="post" action="{{ url_for('product_delete', pid=product.id) }}"
+            onsubmit="return confirm('Delete this product?')">
+        <button class="btn small danger" type="submit">🗑 Delete</button>
+      </form>
+    </div>
+    {% endif %}
+
+    <ul class="detail-perks">
+      <li>🚚 Delivery in 1-3 days</li>
+      <li>📡 Live order tracking</li>
+      <li>🌿 Harvested fresh from the farm</li>
+    </ul>
+  </div>
+</div>
+
+<div class="section-head"><div><h2>Customer reviews</h2></div></div>
+<div class="reviews-wrap">
+  <div class="card panel review-summary">
+    <span class="big-rating">{{ '%.1f'|format(product.avg_rating) }}</span>
+    <p class="stars">{{ '★★★★★'[0:(product.avg_rating)|round|int] }}{{ '☆' * (5 - (product.avg_rating)|round|int) }}</p>
+    <p class="muted small">{{ product.review_count}} review{{ '' if product.review_count == 1 else 's' }}</p>
+
+    {% if current_user %}
+    <form method="post" action="{{ url_for('product_review', pid=product.id) }}" class="review-form">
+      <label>Your rating</label>
+      <div class="star-row">
+        {% for i in [5,4,3,2,1] %}
+        <input type="radio" id="star{{ i }}" name="rating" value="{{ i }}"
+               {{ 'checked' if my_review and my_review.rating == i }}>
+        <label for="star{{ i }}" title="{{ i }} stars">★</label>
+        {% endfor %}
+      </div>
+      <textarea name="comment" rows="3"
+                placeholder="Share your experience…">{{ my_review.comment if my_review else '' }}</textarea>
+      <button class="btn small full" type="submit">{{ 'Update my review' if my_review else 'Submit review' }}</button>
+    </form>
+    {% else %}
+    <p class="muted small"><a href="{{ url_for('login', next=request.path) }}">Log in</a> to write a review.</p>
+    {% endif %}
+  </div>
+
+  <div class="review-list">
+    {% for r in reviews %}
+    <div class="card review-card">
+      <div class="review-head">
+        <strong>{{ r.user_name }}</strong>
+        <span class="stars small-stars">{% for s in range(r.rating) %}★{% endfor %}{% for s in range(5 - r.rating) %}☆{% endfor %}</span>
+        <span class="muted small">{{ r.created_at|datefmt }}</span>
+      </div>
+      {% if r.comment %}<p>{{ r.comment }}</p>{% endif %}
+    </div>
+    {% else %}
+    <p class="muted">No reviews yet. Be the first to review this product!</p>
+    {% endfor %}
+  </div>
+</div>
+
+{% if related %}
+<div class="section-head"><div><h2>Related products</h2></div></div>
+<div class="grid">
+  {% for p in related %}
+  <div class="card product-card">
+    <a href="{{ url_for('product_detail', pid=p.id) }}" class="product-img">
+      {% if p.image %}<img src="{{ url_for('static', filename='uploads/' ~ p.image) }}" alt="{{ p.name }}">
+      {% else %}<span>{{ p.name[0]|upper }}</span>{% endif %}
+    </a>
+    <div class="card-body">
+      <p class="muted small">{{ p.farmer_name }}</p>
+      <h3><a class="plain-link" href="{{ url_for('product_detail', pid=p.id) }}">{{ p.name }}</a></h3>
+      <p class="price">{{ p.price|money }} <small>/ {{ p.unit }}</small></p>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

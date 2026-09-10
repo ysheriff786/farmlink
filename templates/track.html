@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Track Order - FarmLink{% endblock %}
+{% block content %}
+<div class="page-head"><h2>Track Order</h2></div>
+
+<div class="form-card wide">
+  <form method="get" action="{{ url_for('track') }}" class="track-form">
+    <label for="order">Enter your Order ID</label>
+    <div class="track-row">
+      <input type="text" id="order" name="order" placeholder="e.g. 42" value="{{ oid }}">
+      <button class="btn" type="submit">Track</button>
+    </div>
+  </form>
+</div>
+
+{% if oid and result %}
+<div class="flash success">Order #{{ result.id }} found — live tracking below.</div>
+{% endif %}
+
+{% if oid and denied %}
+<div class="flash error">
+  Order #{{ oid }} belongs to a different account. Log in with the account that placed it.
+</div>
+{% endif %}
+
+{% if oid and not result and not denied %}
+  <div class="flash error">No order found with ID #{{ oid }}. Check the ID from your My Orders page.</div>
+{% endif %}
+
+{% if result %}
+<div class="card order-card" data-order-id="{{ result.id }}" data-status="{{ result.status }}" id="trackCard">
+  <div class="order-head">
+    <span>Order #{{ result.id }} — {{ result.created_at|datefmt }}</span>
+    <span class="live-wrap">
+      <span class="status-badge {{ result.status|status_class }}" id="liveStatus">{{ result.status }}</span>
+      <span class="live-pill"><span class="live-dot"></span> LIVE</span>
+    </span>
+  </div>
+  <div class="order-body">
+    <p class="buyer muted">Buyer: {{ result.buyer_name }}</p>
+    <ul class="order-items">
+      {% for l in result.order_lines %}
+      <li>{{ l.quantity }} × {{ l.product_name }}</li>
+      {% endfor %}
+    </ul>
+
+    <div class="timeline" id="timeline">
+      {% set steps = ['Placed', 'Confirmed', 'Out for Delivery', 'Delivered'] %}
+      {% set current_idx = steps.index(result.status) if result.status in steps else -1 %}
+      {% for s in steps %}
+      <div class="tl-step {{ 'done' if current_idx >= loop.index0 else '' }} {{ 'cancelled' if result.status == 'Cancelled' }}">
+        <span class="tl-dot">{{ loop.index }}</span>
+        <span class="tl-label">{{ s }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% if result.status in ('Cancelled',) %}
+      <p class="muted small">⚠️ This order was cancelled.</p>
+    {% elif result.status == 'Pending Payment' %}
+      <p class="muted small">⏳ Waiting for online payment to complete.</p>
+    {% endif %}
+    <p class="muted small" id="liveNote">This page updates automatically — no need to refresh.</p>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if result %}
+<script>
+  var known = document.getElementById("trackCard").dataset.status;
+  var steps = ["Placed", "Confirmed", "Out for Delivery", "Delivered"];
+  setInterval(function () {
+    fetch("{{ url_for('api_order_status', oid=result.id) }}")
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || d.status === known) return;
+        known = d.status;
+        var badge = document.getElementById("liveStatus");
+        badge.textContent = d.status;
+        badge.className = "status-badge " + ({ "Pending Payment": "warn", Placed: "info", Confirmed: "info",
+          "Out for Delivery": "progress", Delivered: "done", Cancelled: "bad" }[d.status] || "info");
+        var idx = steps.indexOf(d.status);
+        document.querySelectorAll("#timeline .tl-step").forEach(function (el, i) {
+          el.classList.toggle("done", idx >= i);
+        });
+        if (d.status === "Delivered") {
+          document.getElementById("liveNote").innerHTML = "✅ Delivered! Status updated just now.";
+        } else {
+          document.getElementById("liveNote").innerHTML = "🔄 Status changed to <strong>" + d.status + "</strong> just now.";
+        }
+      })
+      .catch(function () {});
+  }, 5000);
+</script>
+{% endif %}
+{% endblock %}

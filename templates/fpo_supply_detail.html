@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}{{ supply.name }} - aggregate supply - FarmLink{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h2>{{ supply.name }}</h2>
+    <span class="muted">{{ supply.price|money }} / {{ supply.unit }} ·
+      {% set total = supply.stock %}on hand: {{ total }} {{ supply.unit }} ·
+      min order {{ supply.min_qty|int }}</span>
+  </div>
+  <div class="row-actions">
+    <a class="btn small outline" href="{{ url_for('fpo_supply_edit', sid=supply.id) }}">Edit listing</a>
+    <a class="btn small outline" href="{{ url_for('fpo_dashboard', tab='supply') }}">Supply pool</a>
+  </div>
+</div>
+
+{% if supply.description %}
+<p class="muted small">{{ supply.description }}</p>
+{% endif %}
+
+<div class="dash-grid">
+  <div class="card panel">
+    <h3>Farmer allocations</h3>
+    <p class="muted small">Committed qty is the produce the member farmer has promised you.
+       On hand only counts what is still in their stock (min of committed and stock).</p>
+    {% if sources %}
+    <table class="table plain-table">
+      <tr><th>Member farmer</th><th>Product</th><th>Committed</th><th>Farmer stock</th><th></th></tr>
+      {% for s in sources %}
+      <tr>
+        <td>{{ s.farmer_name }}</td>
+        <td>{{ s.product_name }}</td>
+        <td>
+          <form method="post" action="{{ url_for('fpo_supply_allocation_update', sid=supply.id, aid=s.allocation_id) }}"
+                class="inline-form">
+            <input type="number" name="committed_qty" value="{{ s.committed }}" step="any" min="0.01"
+                   required style="width:7em">
+            <button class="btn small outline" type="submit">Set</button>
+          </form>
+        </td>
+        <td>{{ s.available }} {{ s.unit }}</td>
+        <td class="row-actions">
+          <form method="post" action="{{ url_for('fpo_supply_allocation_remove', sid=supply.id, aid=s.allocation_id) }}"
+                onsubmit="return confirm('Remove this allocation?')">
+            <button class="btn small danger" type="submit">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted">No allocations yet. Add a member farmer's product below to start pooling.</p>
+    {% endif %}
+
+    {% if idle_members %}
+    <h3>Add member produce</h3>
+    <form method="post" action="{{ url_for('fpo_supply_allocation_add', sid=supply.id) }}" class="inline-form">
+      <select name="product_id" required>
+        <option value="">Choose a member product…</option>
+        {% for m in idle_members %}
+        <option value="{{ m.id }}">{{ m.name }} ({{ m.stock }} {{ m.unit }} · {{ m.left }} free)</option>
+        {% endfor %}
+      </select>
+      <input type="number" name="committed_qty" placeholder="Committed qty" step="any" min="0.01" required>
+      <button class="btn small" type="submit">Add allocation</button>
+    </form>
+    {% else %}
+    <p class="muted">No member farmer produce left to allocate.</p>
+    {% endif %}
+  </div>
+
+  <div class="card panel">
+    <h3>Consumption ledger</h3>
+    <p class="muted small">Per-sale allocations — who supplied what for future settlement.</p>
+    {% if consumption %}
+    <table class="table plain-table">
+      <tr><th>Order</th><th>Source</th><th>Farmer</th><th>Qty</th><th>Date</th></tr>
+      {% for c in consumption %}
+      <tr>
+        <td>#{{ c.order_id }}{% if c.kind == 'bulk' %}<span class="status-badge info">bulk</span>{% endif %}</td>
+        <td>{% if c.kind == 'bulk' %}Bulk order{% else %}Marketplace order{% endif %}</td>
+        <td>{{ c.farmer_name }}</td>
+        <td>{{ c.qty }} {{ supply.unit }}</td>
+        <td>{{ c.created_at|datefmt }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted">No sales against this supply yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

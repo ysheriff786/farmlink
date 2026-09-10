@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %}FarmLink - Fresh from the farm{% endblock %}
+{% block content %}
+<section class="hero-slider" id="heroSlider">
+  <div class="slide s1 active">
+    <div class="slide-bg" style="background-image:url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&amp;fit=crop&amp;w=1600&amp;q=80')"></div>
+    <div class="slide-text">
+      <span class="slide-tag">India's Institutional Farm Marketplace</span>
+      <h1>Direct sourcing from verified farmers <em>across India</em></h1>
+      <p>B2B marketplace connecting farmers, FPOs, and bulk buyers with transparent pricing and pooled supply.</p>
+      <div class="hero-actions">
+        <a class="btn light" href="{{ url_for('products') }}">Browse Marketplace</a>
+        <a class="btn outline-light" href="{{ url_for('register') }}">Register as Seller</a>
+      </div>
+    </div>
+  </div>
+  <div class="slide s2">
+    <div class="slide-bg" style="background-image:url('https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?auto=format&amp;fit=crop&amp;w=1600&amp;q=80')"></div>
+    <div class="slide-text">
+      <span class="slide-tag">Shop by season</span>
+      <h1>Choose the right crop for <em>better harvests</em></h1>
+      <p>Vegetables, fruits, flowers, grains, dairy and honey from trusted local growers.</p>
+      <div class="hero-actions">
+        <a class="btn light" href="{{ url_for('products') }}">Browse Categories</a>
+        <a class="btn outline-light" href="{{ url_for('track') }}">Track Your Order</a>
+      </div>
+    </div>
+  </div>
+  <div class="slide s3">
+    <div class="slide-bg" style="background-image:url('https://images.unsplash.com/photo-1592982537447-7440770cbfc9?auto=format&amp;fit=crop&amp;w=1600&amp;q=80')"></div>
+    <div class="slide-text">
+      <span class="slide-tag">Farm to door</span>
+      <h1>Live order tracking, <em>delivered across India</em></h1>
+      <p>Follow every order in real time &mdash; from Placed to Out for Delivery to Delivered.</p>
+      <div class="hero-actions">
+        <a class="btn light" href="{{ url_for('products') }}">Start Buying</a>
+        <a class="btn outline-light" href="{{ url_for('track') }}">Track an Order</a>
+      </div>
+    </div>
+  </div>
+  <div class="hero-trust">
+    <span class="trust-chip"><b id="trustFarmers">--</b> Active farmers</span>
+    <span class="trust-chip"><b id="trustOrders">--</b> Orders processed</span>
+    <span class="trust-chip trust-static">Avg fulfillment 1&ndash;3 days</span>
+  </div>
+  <button class="slider-arrow prev" data-dir="-1" aria-label="Previous">&#8249;</button>
+  <button class="slider-arrow next" data-dir="1" aria-label="Next">&#8250;</button>
+  <div class="slider-dots" id="sliderDots"></div>
+</section>
+
+<section class="feature-strip">
+  <div class="feat"><span>&#x1F33F;</span><div><strong>Genuine &amp; fresh</strong><small>Sourced direct from farms</small></div></div>
+  <div class="feat"><span>&#x1F4B0;</span><div><strong>Fair pricing</strong><small>No middlemen margins</small></div></div>
+  <div class="feat"><span>&#x1F69A;</span><div><strong>Fast delivery</strong><small>1-3 days across India</small></div></div>
+  <div class="feat"><span>&#x1F4E1;</span><div><strong>Real-time tracking</strong><small>Live status updates</small></div></div>
+</section>
+
+<div class="section-head">
+  <div>
+    <h2>Shop by category</h2>
+    <p class="muted">Find exactly what you need</p>
+  </div>
+  <a class="btn small outline" href="{{ url_for('products') }}">View all &rarr;</a>
+</div>
+<div class="cat-grid">
+  {% for c in categories %}
+  <a class="cat-card" href="{{ url_for('products', cat=c.name) }}">
+    <strong>{{ c.name }}</strong>
+    <small>{{ c.count }} product{{ '' if c.count == 1 else 's' }}</small>
+  </a>
+  {% endfor %}
+</div>
+
+<div class="section-head">
+  <div>
+    <h2>Top selling products</h2>
+    <p class="muted">Best choices by customers</p>
+  </div>
+  <a class="btn small outline" href="{{ url_for('products') }}">View all &rarr;</a>
+</div>
+<div class="grid">
+  {% for p in top_products %}
+  <div class="card product-card">
+    <a href="{{ url_for('product_detail', pid=p.id) }}" class="product-img">
+      {% if p.image %}<img src="{{ url_for('static', filename='uploads/' ~ p.image) }}" alt="{{ p.name }}">
+      {% else %}<span>{{ p.name[0]|upper }}</span>{% endif %}
+      {% if p.stock > 0 %}<span class="farm-badge">Direct from farm</span>{% endif %}
+      {% if p.stock <= 0 %}<span class="out-badge">Out of stock</span>{% endif %}
+    </a>
+    <div class="card-body">
+      <p class="muted small">{{ p.farmer_name }}</p>
+      <h3><a class="plain-link" href="{{ url_for('product_detail', pid=p.id) }}">{{ p.name }}</a></h3>
+      <p class="stars">&#9733; {{ '%.1f'|format(p.avg_rating) }} <small>({{ p.review_count }})</small></p>
+      <p class="price">{{ p.price|money }} <small>/ {{ p.unit }}</small></p>
+      <a class="btn small full" href="{{ url_for('product_detail', pid=p.id) }}">View &rarr;</a>
+    </div>
+  </div>
+  {% else %}
+  <p class="muted">No products yet. Farmers can add the first one!</p>
+  {% endfor %}
+</div>
+
+<section class="testimonials">
+  <div class="section-head">
+    <div>
+      <h2>Farmer success stories</h2>
+      <p class="muted">Real growers, real impact</p>
+    </div>
+    <div class="t-controls">
+      <button class="t-arrow" data-dir="-1" type="button" aria-label="Previous testimonial">&#8249;</button>
+      <button class="t-arrow" data-dir="1" type="button" aria-label="Next testimonial">&#8250;</button>
+    </div>
+  </div>
+  <div class="t-track" id="testimonialTrack">
+    <figure class="t-card">
+      <blockquote>&ldquo;I tripled my vegetable sales since joining FarmLink. Payments land in my account the moment an order is delivered.&rdquo;</blockquote>
+      <figcaption>
+        <span class="t-avatar">RS</span>
+        <span class="t-meta"><strong>Ramesh Kumar</strong><small>Tomato grower, Mandya</small></span>
+      </figcaption>
+    </figure>
+    <figure class="t-card">
+      <blockquote>&ldquo;Buyers find me directly &mdash; no middlemen taking a cut. My honey reaches customers across three cities now.&rdquo;</blockquote>
+      <figcaption>
+        <span class="t-avatar">LD</span>
+        <span class="t-meta"><strong>Lakshmi Devi</strong><small>Honey &amp; dairy, Nashik</small></span>
+      </figcaption>
+    </figure>
+    <figure class="t-card">
+      <blockquote>&ldquo;The live tracking means my fresh produce never sits around. Customers get it the same week it is harvested.&rdquo;</blockquote>
+      <figcaption>
+        <span class="t-avatar">VG</span>
+        <span class="t-meta"><strong>Vijay Gouda</strong><small>Vegetable farmer, Coimbatore</small></span>
+      </figcaption>
+    </figure>
+  </div>
+  <div class="t-dots" id="tDots"></div>
+</section>
+
+<h2>How FarmLink works</h2>
+<div class="how">
+  <div class="card how-card">
+    <h3>For Customers</h3>
+    <ol>
+      <li>Register as a customer</li>
+      <li>Browse fresh products from local farmers</li>
+      <li>Add to cart and place your order</li>
+      <li>Track it live until delivery</li>
+    </ol>
+  </div>
+  <div class="card how-card">
+    <h3>For Farmers</h3>
+    <ol>
+      <li>Register as a farmer</li>
+      <li>List your produce with price and stock</li>
+      <li>Receive orders directly from customers</li>
+      <li>Update status &mdash; buyers see it instantly</li>
+    </ol>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var slides = document.querySelectorAll("#heroSlider .slide");
+  var dotsWrap = document.getElementById("sliderDots");
+  var current = 0, timer;
+  if (slides.length && dotsWrap) {
+    slides.forEach(function (_, i) {
+      var d = document.createElement("button");
+      d.className = "dot" + (i === 0 ? " on" : "");
+      d.setAttribute("aria-label", "Go to slide " + (i + 1));
+      d.onclick = function () { show(i); restart(); };
+      dotsWrap.appendChild(d);
+    });
+    function show(i) {
+      slides[current].classList.remove("active");
+      dotsWrap.children[current].classList.remove("on");
+      current = (i + slides.length) % slides.length;
+      slides[current].classList.add("active");
+      dotsWrap.children[current].classList.add("on");
+    }
+    function restart() { clearInterval(timer); timer = setInterval(function () { show(current + 1); }, 5000); }
+    document.querySelectorAll(".slider-arrow").forEach(function (b) {
+      b.onclick = function () { show(current + parseInt(b.dataset.dir)); restart(); };
+    });
+    restart();
+  }
+
+  var tTrack = document.getElementById("testimonialTrack");
+  var tDots = document.getElementById("tDots");
+  if (tTrack && tDots) {
+    var tCards = tTrack.querySelectorAll(".t-card");
+    tCards.forEach(function (_, i) {
+      var d = document.createElement("button");
+      d.className = "t-dot" + (i === 0 ? " on" : "");
+      d.onclick = function () {
+        tTrack.scrollTo({ left: tTrack.children[i].offsetLeft - tTrack.offsetLeft, behavior: "smooth" });
+      };
+      tDots.appendChild(d);
+    });
+    function syncTDots() {
+      var idx = Math.round(tTrack.scrollLeft / (tTrack.children[0].offsetWidth + 16));
+      Array.prototype.forEach.call(tDots.children, function (d, i) {
+        d.classList.toggle("on", i === idx);
+      });
+    }
+    tTrack.addEventListener("scroll", syncTDots, { passive: true });
+    document.querySelectorAll(".t-arrow").forEach(function (b) {
+      b.onclick = function () {
+        var step = tTrack.children[0].offsetWidth + 16;
+        tTrack.scrollBy({ left: parseInt(b.dataset.dir) * step, behavior: "smooth" });
+      };
+    });
+  }
+
+  function loadStats() {
+    fetch("{{ url_for('api_stats') }}").then(function (r) { return r.json(); }).then(function (d) {
+      var tf = document.getElementById("trustFarmers");
+      var to = document.getElementById("trustOrders");
+      if (tf) tf.textContent = d.farmers + "+";
+      if (to) to.textContent = d.orders + "+";
+    }).catch(function () {});
+  }
+  loadStats();
+  setInterval(loadStats, 8000);
+</script>
+{% endblock %}

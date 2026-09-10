@@ -1,0 +1,13 @@
+{% set chat_oid = g.order_id if current_user.role in ['farmer', 'fpo'] else o.id %}
+<div class="chat-toggle-wrap">
+  <button type="button" class="btn small outline chat-toggle" data-oid="{{ chat_oid }}">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" style="vertical-align:-2px; margin-right:6px;"><path d="M21 12a8 8 0 0 1-8 8H4l2.3-2.3A8 8 0 1 1 21 12z" transform="translate(0,-2)"/><path d="M8.5 10.5h7M8.5 13.5h4.5"/></svg>
+    {{ 'Chat with buyer' if current_user.role in ['farmer', 'fpo'] else 'Chat with farmer' }}</button>
+</div>
+<div class="chat-box card" id="chat-{{ chat_oid }}" hidden>
+  <div class="chat-msgs"></div>
+  <form class="chat-input-row">
+    <input type="text" class="chat-input" placeholder="Type a message…" maxlength="500" autocomplete="off">
+    <button class="btn small" type="submit">Send</button>
+  </form>
+</div>

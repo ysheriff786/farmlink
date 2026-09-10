@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Assignment #{{ assignment.id }} - FarmLink{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h2>Delivery Assignment #{{ assignment.id }}</h2>
+  <div class="head-actions">
+    <a class="btn small outline" href="{{ url_for('logistics_dashboard') }}">Back to Dashboard</a>
+  </div>
+</div>
+
+<div class="stats dash-stats">
+  <div class="stat"><span class="stat-num">{{ assignment.status }}</span><small>Status</small></div>
+  <div class="stat"><span class="stat-num">{{ assignment.vehicle_type or '-' }}</span><small>Vehicle</small></div>
+  <div class="stat"><span class="stat-num">{{ assignment.driver_name or '-' }}</span><small>Driver</small></div>
+  <div class="stat"><span class="stat-num">{{ assignment.capacity_kg or 0 }} kg</span><small>Capacity</small></div>
+</div>
+
+<div class="dash-grid">
+  <div class="card panel">
+    <h3>Assignment Details</h3>
+    <table class="table plain-table">
+      <tr><th>Order</th><td>
+        {% if assignment.order_id %}Order #{{ assignment.order_id }}{% elif assignment.bulk_order_id %}Bulk Order #{{ assignment.bulk_order_id }}{% else %}-{% endif %}
+      </td></tr>
+      <tr><th>Logistics Partner</th><td>{{ assignment.logistics_company or '-' }}</td></tr>
+      <tr><th>Pickup</th><td>{{ assignment.pickup_address or assignment.pickup_city or '-' }}
+        {% if assignment.pickup_latitude %}<br><small class="muted">{{ '%.4f'|format(assignment.pickup_latitude) }}, {{ '%.4f'|format(assignment.pickup_longitude) }}</small>{% endif %}
+      </td></tr>
+      <tr><th>Destination</th><td>{{ assignment.destination_address or assignment.destination_city or '-' }}
+        {% if assignment.destination_latitude %}<br><small class="muted">{{ '%.4f'|format(assignment.destination_latitude) }}, {{ '%.4f'|format(assignment.destination_longitude) }}</small>{% endif %}
+      </td></tr>
+      <tr><th>Assigned at</th><td>{{ assignment.assigned_at or '-' }}</td></tr>
+      <tr><th>Picked up</th><td>{{ assignment.picked_up_at or 'Not yet picked up' }}</td></tr>
+      <tr><th>Delivered</th><td>{{ assignment.delivered_at or '-' }}</td></tr>
+      <tr><th>Notes</th><td>{{ assignment.notes or '-' }}</td></tr>
+    </table>
+
+    {% if assignment.status not in ['Delivered', 'Failed', 'Cancelled'] %}
+    <h3 class="mt">Update Status</h3>
+    <form method="post" action="{{ url_for('logistics_assignment_update', aid=assignment.id) }}">
+      {% set transitions = {
+        'Assigned': ['Pickup Pending', 'Cancelled'],
+        'Pickup Pending': ['Picked Up', 'Failed', 'Cancelled'],
+        'Picked Up': ['In Transit', 'Failed'],
+        'In Transit': ['Arrived', 'Failed'],
+        'Arrived': ['Delivered', 'Failed']
+      } %}
+      <select name="status">
+        {% for s in transitions.get(assignment.status, []) %}
+        <option value="{{ s }}">{{ s }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn">Update Status</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="card panel">
+    <h3>Route Map</h3>
+    <div id="assignmentMap" style="height: 350px; border-radius: 8px;"></div>
+  </div>
+</div>
+
+{% if order_assignments and order_assignments|length > 1 %}
+<div class="card panel mt">
+  <h3>Assignment History for Order</h3>
+  <table class="table plain-table">
+    <tr><th>Assignment</th><th>Logistics</th><th>Vehicle</th><th>Status</th><th>Assigned</th></tr>
+    {% for a in order_assignments %}
+    <tr>
+      <td>#{{ a.id }}{% if a.id == assignment.id %} <span class="status-badge info">current</span>{% endif %}</td>
+      <td>{{ a.logistics_company }}</td>
+      <td>{{ a.vehicle_type }}</td>
+      <td><span class="status-badge {{ a.status|status_class }}">{{ a.status }}</span></td>
+      <td>{{ a.created_at[:16] }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+<script>
+  var map = L.map('assignmentMap');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  var pts = [];
+  {% if assignment.pickup_latitude %}
+  var pickup = L.marker([{{ assignment.pickup_latitude }}, {{ assignment.pickup_longitude }}], { icon: L.divIcon({ html: '<div style="color:#2e7d32;font-size:20px;">🟢</div>', className: '' }) })
+    .bindPopup('Pickup<br>{{ assignment.pickup_address or assignment.pickup_city }}').addTo(map);
+  pts.push([{{ assignment.pickup_latitude }}, {{ assignment.pickup_longitude }}]);
+  {% endif %}
+  {% if assignment.destination_latitude %}
+  var dest = L.marker([{{ assignment.destination_latitude }}, {{ assignment.destination_longitude }}], { icon: L.divIcon({ html: '<div style="color:#c62828;font-size:20px;">🔴</div>', className: '' }) })
+    .bindPopup('Destination<br>{{ assignment.destination_address or assignment.destination_city }}').addTo(map);
+  pts.push([{{ assignment.destination_latitude }}, {{ assignment.destination_longitude }}]);
+  {% endif %}
+  {% if not assignment.pickup_latitude and not assignment.destination_latitude %}
+  map.setView([22.0, 79.0], 5);
+  {% else %}
+  if (pts.length === 1) {
+    var pt = pts[0];
+    var m = L.marker(pt).addTo(map);
+    map.setView(pt, 10);
+  } else if (pts.length > 1) {
+    L.polyline(pts, { color: '#2e7d32', weight: 3 }).addTo(map);
+    map.fitBounds(L.latLngBounds(pts));
+  }
+  {% endif %}
+
+  var hasPickup = {{ 1 if assignment.pickup_latitude else 0 }};
+  var hasDest = {{ 1 if assignment.destination_latitude else 0 }};
+  if (hasPickup && hasDest) {
+    fetch('/api/route/optimize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pickups: [{ lat: {{ assignment.pickup_latitude }}, lng: {{ assignment.pickup_longitude }}, load_kg: 0 }],
+        deliveries: [{ lat: {{ assignment.destination_latitude }}, lng: {{ assignment.destination_longitude }}, load_kg: 0 }]
+      })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+      var el = document.getElementById('routeSummary');
+      if (el && res.total_distance_km !== undefined) {
+        el.innerHTML = '<strong>Estimated distance:</strong> ' + res.total_distance_km + ' km · <strong>ETA:</strong> ~' + Math.round(res.total_duration_min) + ' min';
+      }
+    })
+    .catch(function () {});
+  }
+</script>
+<style>.mt { margin-top: 16px; }</style>
+{% endblock %}

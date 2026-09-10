@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Checkout - FarmLink{% endblock %}
+{% block content %}
+<h2>Checkout</h2>
+<div class="checkout-grid">
+  <div class="card panel">
+    <h3>Delivery details</h3>
+    <form method="post" action="{{ url_for('place_order') }}">
+      <label for="phone">Phone number</label>
+      <input id="phone" name="phone" type="tel" required pattern="[0-9]{10}"
+             placeholder="10-digit mobile number"
+             value="{{ user.phone or '' }}">
+
+      <label for="address">Delivery address</label>
+      <textarea id="address" name="address" rows="3" required
+                placeholder="House no, street, village/town, district, pincode">{{ user.address or '' }}</textarea>
+
+      <fieldset class="role-group">
+        <legend>Payment method</legend>
+        <label class="radio"><input type="radio" name="payment_method" value="COD" checked>
+          Cash on Delivery - pay when you receive</label>
+        {% if online_enabled %}
+        <label class="radio"><input type="radio" name="payment_method" value="Online">
+          Pay online - UPI / card / netbanking (Razorpay)</label>
+        {% else %}
+        <label class="radio disabled"><input type="radio" disabled>
+          Online payment coming soon</label>
+        {% endif %}
+      </fieldset>
+
+      <button class="btn full" type="submit">Place Order</button>
+    </form>
+  </div>
+
+  <div class="card panel">
+    <h3>Order summary</h3>
+    <ul class="summary-list">
+      {% for i in items %}
+      <li>{{ i.name }} x {{ i.quantity }}<span>{{ (i.price * i.quantity)|money }}</span></li>
+      {% endfor %}
+    </ul>
+    <p class="summary-total">Total: {{ total|money }}</p>
+  </div>
+</div>
+{% endblock %}

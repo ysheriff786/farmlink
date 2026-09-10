@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Supply Chain Map - FarmLink{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h2>Supply Chain Map</h2>
+  <p class="muted">Shows farmers, FPOs, bulk buyers, logistics partners and active deliveries with coordinates. Only location data voluntarily shared by users is shown.</p>
+</div>
+
+<div class="card panel map-controls">
+  <button class="btn small" onclick="showOnly('farmer')">Farmers</button>
+  <button class="btn small" onclick="showOnly('fpo')">FPOs</button>
+  <button class="btn small" onclick="showOnly('buyer')">Buyers</button>
+  <button class="btn small" onclick="showOnly('logistics')">Logistics</button>
+  <button class="btn small" onclick="showOnly('delivery')">Deliveries</button>
+  <button class="btn small" onclick="showOnly('all')">Show all</button>
+</div>
+
+<div id="supplyMap" style="height: 520px; border-radius: 10px;"></div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+  var map = L.map('supplyMap').setView([22.0, 79.0], 5);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+
+  var allLayers = [];
+
+  function makeIcon(emoji, color) {
+    return L.divIcon({
+      html: '<div style="font-size:20px;color:' + color + ';text-shadow:0 1px 2px rgba(0,0,0,.4)">' + emoji + '</div>',
+      className: '', iconSize: [24, 24]
+    });
+  }
+
+  fetch('{{ url_for("api_map_data") }}')
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      d.entities.forEach(function (e) {
+        if (e.type === 'delivery') {
+          if (e.pickup_lat && e.dest_lat) {
+            var line = L.polyline([[e.pickup_lat, e.pickup_lng], [e.dest_lat, e.dest_lng]], {
+              color: '#7b1fa2', weight: 2, dashArray: '4,6', opacity: 0.7
+            });
+            allLayers.push(line);
+            L.marker([e.pickup_lat, e.pickup_lng], { icon: makeIcon('🟢', '#2e7d32') })
+              .bindPopup('<strong>Pickup</strong> #' + e.id + '<br>' + (e.pickup || '')).addTo(map);
+            L.marker([e.dest_lat, e.dest_lng], { icon: makeIcon('🔴', '#c62828') })
+              .bindPopup('<strong>Destination</strong> #' + e.id + '<br>Status: ' + e.status + '<br>' + (e.destination || '')).addTo(map);
+          }
+          return;
+        }
+        var icon = makeIcon('🧑‍🌾', '#2e7d32');
+        var label = e.name;
+        if (e.type === 'fpo') { icon = makeIcon('🏢', '#1565c0'); label += ' (FPO)'; }
+        else if (e.type === 'buyer') { icon = makeIcon('🛒', '#f57c00'); label += ' (' + (e.buyer_type || 'Buyer') + ')'; }
+        else if (e.type === 'logistics') { icon = makeIcon('🚚', '#6a1b9a'); label += ' (Logistics)'; }
+        var m = L.marker([e.lat, e.lng], { icon: icon, title: label })
+          .bindPopup('<strong>' + label + '</strong><br>'
+            + (e.city ? e.city + '<br>' : '')
+            + (e.address ? e.address + '<br>' : '')
+            + (e.member_count ? 'Members: ' + e.member_count + '<br>' : '')
+            + (e.crops ? 'Crops: ' + e.crops + '<br>' : '')
+            + '<a href="{{ url_for("products") }}">View marketplace</a>');
+        m.addTo(map);
+        m._entityType = e.type;
+        allLayers.push(m);
+      });
+
+      if (allLayers.length > 0) {
+        try {
+          var group = L.featureGroup(allLayers.filter(function (l) { return l.getLatLng; }));
+          if (group.getLayers().length > 0) map.fitBounds(group.getBounds());
+        } catch (e) {}
+      }
+    })
+    .catch(function () {});
+
+  function showOnly(type) {
+    allLayers.forEach(function (layer) {
+      if (type === 'all') { map.addLayer(layer); return; }
+      if (layer._entityType === type) map.addLayer(layer);
+      else map.removeLayer(layer);
+    });
+  }
+</script>
+<style>
+  .map-controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+</style>
+{% endblock %}

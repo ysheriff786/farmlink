@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% block title %}Route Optimizer - FarmLink{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h2>Delivery Route Optimizer</h2>
+  <p class="muted">Optimizes delivery routes using road-network data (OSRM) with capacity and pickup-before-delivery constraints.</p>
+</div>
+
+<div class="route-grid">
+  <div class="route-controls">
+    <div class="card panel">
+      <h3>Vehicle & Load</h3>
+      <form id="routeForm">
+        <label for="vehicleSelect">Vehicle</label>
+        <select id="vehicleSelect" name="vehicle_id">
+          <option value="">Select vehicle...</option>
+          {% for v in vehicles %}
+          <option value="{{ v.id }}" data-cap="{{ v.capacity_kg }}">{{ v.vehicle_type }} - {{ v.registration_number }} ({{ v.capacity_kg }} kg)</option>
+          {% endfor %}
+        </select>
+
+        <label for="depotLat">Depot / Starting point latitude</label>
+        <input type="number" id="depotLat" name="depot_lat" step="any" placeholder="e.g. 12.9716">
+
+        <label for="depotLng">Depot / Starting point longitude</label>
+        <input type="number" id="depotLng" name="depot_lng" step="any" placeholder="e.g. 77.5946">
+
+        <h3 class="mt">Stops</h3>
+        <div id="stopsList">
+          <div class="stop-row">
+            <select class="stop-type" onchange="this.closest('.stop-row').querySelector('.stop-label').value=''">
+              <option value="pickup">Pickup</option>
+              <option value="delivery">Delivery</option>
+            </select>
+            <input type="number" class="stop-lat" placeholder="Lat" step="any">
+            <input type="number" class="stop-lng" placeholder="Lng" step="any">
+            <input type="number" class="stop-load" placeholder="Load kg" step="any" value="50">
+            <button type="button" class="btn small danger" onclick="removeStop(this)">✕</button>
+          </div>
+        </div>
+        <button type="button" class="btn small ghost" onclick="addStop()">+ Add stop</button>
+
+        <button type="submit" class="btn full mt">Optimize Route</button>
+      </form>
+    </div>
+
+    <div class="card panel mt">
+      <h3>Optimization Result</h3>
+      <div id="routeResult">
+        <p class="muted">Enter stops and click "Optimize Route" to see the optimized delivery sequence.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="route-map">
+    <div id="map" style="height: 600px; border-radius: 10px;"></div>
+  </div>
+</div>
+
+<div class="card panel mt">
+  <h3>Active Deliveries (use as presets)</h3>
+  {% if stops %}
+  <div class="table-scroll">
+    <table class="table">
+      <tr><th>Type</th><th>Stop</th><th>Coordinates</th><th>Use</th></tr>
+      {% for s in stops %}
+      <tr>
+        <td><span class="status-badge {{ 'info' if s.type == 'pickup' else 'progress' }}">{{ 'Pickup' if s.type == 'pickup' else 'Delivery' }}</span></td>
+        <td>{{ s.label }}</td>
+        <td>{{ '%.4f'|format(s.lat) }}, {{ '%.4f'|format(s.lng) }}</td>
+        <td><button type="button" class="btn small ghost" onclick="addPresetStop('{{ s.type }}', {{ s.lat }}, {{ s.lng }}, {{ s.load_kg }})">+ Add</button></td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">No active deliveries with coordinates yet. You can add stops manually above.</p>
+  {% endif %}
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+  var map = L.map('map').setView([22.0, 79.0], 5);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+
+  var markers = [];
+
+  function clearMarkers() {
+    markers.forEach(function (m) { map.removeLayer(m); });
+    markers = [];
+  }
+
+  function addStop() {
+    var list = document.getElementById('stopsList');
+    var row = document.createElement('div');
+    row.className = 'stop-row';
+    row.innerHTML = '<select class="stop-type" onchange="this.closest(\'.stop-row\').querySelector(\'.stop-label\').value=\'\'">'
+      + '<option value="pickup">Pickup</option><option value="delivery">Delivery</option></select>'
+      + '<input type="number" class="stop-lat" placeholder="Lat" step="any">'
+      + '<input type="number" class="stop-lng" placeholder="Lng" step="any">'
+      + '<input type="number" class="stop-load" placeholder="Load kg" step="any" value="50">'
+      + '<button type="button" class="btn small danger" onclick="removeStop(this)">✕</button>';
+    list.appendChild(row);
+  }
+
+  function removeStop(btn) {
+    btn.closest('.stop-row').remove();
+  }
+
+  function addPresetStop(type, lat, lng, load) {
+    var list = document.getElementById('stopsList');
+    var row = document.createElement('div');
+    row.className = 'stop-row';
+    row.innerHTML = '<select class="stop-type">'
+      + '<option value="' + type + '" selected>' + (type === 'pickup' ? 'Pickup' : 'Delivery') + '</option>'
+      + '<option value="pickup">Pickup</option><option value="delivery">Delivery</option></select>'
+      + '<input type="number" class="stop-lat" value="' + lat + '" step="any">'
+      + '<input type="number" class="stop-lng" value="' + lng + '" step="any">'
+      + '<input type="number" class="stop-load" value="' + load + '" step="any">'
+      + '<button type="button" class="btn small danger" onclick="removeStop(this)">✕</button>';
+    list.appendChild(row);
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function collectStops() {
+    var pickups = [], deliveries = [];
+    document.querySelectorAll('.stop-row').forEach(function (row) {
+      var lat = parseFloat(row.querySelector('.stop-lat').value);
+      var lng = parseFloat(row.querySelector('.stop-lng').value);
+      var load = parseFloat(row.querySelector('.stop-load').value) || 0;
+      var type = row.querySelector('.stop-type').value;
+      if (isNaN(lat) || isNaN(lng)) return;
+      var stop = { lat: lat, lng: lng, load_kg: load };
+      if (type === 'pickup') pickups.push(stop);
+      else deliveries.push(stop);
+    });
+    return { pickups: pickups, deliveries: deliveries };
+  }
+
+  var resultShown = false;
+
+  document.getElementById('routeForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var data = collectStops();
+    if (data.pickups.length === 0 && data.deliveries.length === 0) {
+      document.getElementById('routeResult').innerHTML = '<p class="muted">Add at least one stop to optimize a route.</p>';
+      return;
+    }
+    var vl = document.getElementById('depotLat').value;
+    var vn = document.getElementById('depotLng').value;
+    if (vl && vn && !isNaN(parseFloat(vl)) && !isNaN(parseFloat(vn))) {
+      data.depot = [parseFloat(vl), parseFloat(vn)];
+    }
+    var vehicleSel = document.getElementById('vehicleSelect');
+    var cap = vehicleSel.selectedOptions.length ? parseFloat(vehicleSel.selectedOptions[0].dataset.cap || 0) : 0;
+
+    fetch('/api/route/optimize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (result) {
+      clearMarkers();
+      resultShown = true;
+      var box = document.getElementById('routeResult');
+      var totalLoad = (result.total_load_kg || 0);
+      var capMsg = '';
+      if (cap > 0) {
+        if (totalLoad > cap) {
+          capMsg = '<div class="flash error">⚠️ Load (' + totalLoad + ' kg) exceeds vehicle capacity (' + cap + ' kg).</div>';
+        } else {
+          capMsg = '<p class="cap-ok">✔ Vehicle load: ' + totalLoad + ' kg / ' + cap + ' kg (' + Math.round(totalLoad / cap * 100) + '% utilization)</p>';
+        }
+      }
+
+      var usingOsrm = (result.route_geometry !== null);
+      var html = '<div class="flash ' + (usingOsrm ? 'success' : 'warn') + '">'
+        + (usingOsrm ? '✔ Optimized using OSRM road-network data' : '⚠ OSRM unavailable — used nearest-neighbour heuristic (road distances are estimates)')
+        + '</div>';
+      html += capMsg;
+      html += '<p><strong>Total distance:</strong> ' + (result.total_distance_km || 0) + ' km</p>'
+           + '<p><strong>Estimated travel time:</strong> ' + Math.round(result.total_duration_min || 0) + ' min</p>'
+           + '<p><strong>Total load:</strong> ' + result.total_load_kg + ' kg</p>'
+           + '<hr><h4>Optimized stop order</h4><ol>';
+      (result.stops || []).forEach(function (s) {
+        html += '<li><strong>' + s.label + '</strong> (' + s.type + ') — cumulative load ' + (s.cumulative_load_kg || 0) + ' kg</li>';
+      });
+      html += '</ol>';
+      box.innerHTML = html;
+
+      /* Draw markers and route on map */
+      var latLngs = [];
+      (result.stops || []).forEach(function (s) {
+        var icon = s.type === 'pickup' ? '🟢' : s.type === 'depot' ? '🏢' : '🔴';
+        var imgIcon = L.divIcon({ html: '<div class="route-marker-icon">' + icon + '</div>', className: '', iconSize: [24, 24] });
+        var m = L.marker([s.lat, s.lng], { icon: imgIcon })
+          .bindPopup('<strong>' + (s.label || 'Stop') + '</strong><br>Type: ' + s.type + '<br>Load: ' + (s.cumulative_load_kg || 0) + ' kg' + '<br><small>Seq: ' + s.sequence + '</small>')
+          .addTo(map);
+        markers.push(m);
+        latLngs.push([s.lat, s.lng]);
+      });
+
+      if (result.route_geometry && result.route_geometry.coordinates) {
+        var geomLatLngs = result.route_geometry.coordinates.map(function (c) { return [c[1], c[0]]; });
+        L.polyline(geomLatLngs, { color: '#2e7d32', weight: 4, opacity: 0.8 }).addTo(map);
+        map.fitBounds(L.latLngBounds(geomLatLngs));
+      } else if (latLngs.length > 0) {
+        L.polyline(latLngs, { color: '#3388ff', weight: 3, dashArray: '5,8', opacity: 0.8 }).addTo(map);
+        map.fitBounds(L.latLngBounds(latLngs));
+      }
+    })
+    .catch(function (err) {
+      document.getElementById('routeResult').innerHTML = '<div class="flash error">Route optimization failed. ' + err + '</div>';
+    });
+  });
+</script>
+<style>
+  .route-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  .route-controls { display: flex; flex-direction: column; gap: 20px; }
+  .route-marker-icon { font-size: 18px; text-align: center; }
+  .stop-row { display: grid; grid-template-columns: 1fr 1fr 1fr 70px 30px; gap: 6px; margin-bottom: 8px; align-items: center; }
+  .mt { margin-top: 16px; }
+  .cap-ok { color: #2e7d32; font-weight: 600; }
+  .inline-form { display: inline-flex; gap: 6px; align-items: center; }
+  .status-select { padding: 4px 6px; border-radius: 6px; border: 1px solid #ccc; }
+  @media (max-width: 900px) {
+    .route-grid { grid-template-columns: 1fr; }
+    #map { height: 400px !important; }
+  }
+</style>
+{% endblock %}

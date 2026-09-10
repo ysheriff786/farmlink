@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if product else 'New' }} aggregate supply - FarmLink{% endblock %}
+{% block content %}
+<div class="form-card wide">
+  <h2>{{ 'Edit aggregate supply listing' if product else 'New aggregate supply listing' }}</h2>
+  <p class="muted small">This becomes a buyable product on the marketplace. After saving, add member-farmer
+     allocations so the system knows which produce backs it and how much is available.</p>
+  {% if product %}
+  <p><a class="small" href="{{ url_for('fpo_supply_detail', sid=product.id) }}">&larr; Back to allocations</a></p>
+  {% else %}
+  <p><a class="small" href="{{ url_for('fpo_dashboard', tab='supply') }}">&larr; Back to supply pool</a></p>
+  {% endif %}
+  <form method="post">
+    <label for="name">Listing name</label>
+    <input id="name" name="name" type="text" required maxlength="120"
+           value="{{ product.name if product else '' }}">
+
+    <label for="description">Description (optional)</label>
+    <textarea id="description" name="description" rows="3">{{ product.description if product else '' }}</textarea>
+
+    <div class="row">
+      <div>
+        <label for="price">Price (₹)</label>
+        <input id="price" name="price" type="number" step="0.01" min="0.01" required
+               value="{{ product.price if product else '' }}">
+      </div>
+      <div>
+        <label for="mrp">MRP (₹, optional)</label>
+        <input id="mrp" name="mrp" type="number" step="0.01" min="0"
+               value="{{ product.mrp if product and product.mrp else '' }}">
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label for="unit">Unit</label>
+        <select id="unit" name="unit">
+          {% for u in units %}
+          <option value="{{ u }}" {{ 'selected' if product and product.unit == u }}>{{ u }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="category">Category</label>
+        <select id="category" name="category">
+          {% for c in categories %}
+          <option value="{{ c }}" {{ 'selected' if product and product.category == c }}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <label for="min_qty">Minimum order (units)</label>
+    <input id="min_qty" name="min_qty" type="number" min="1" step="1" required
+           value="{{ product.min_qty|int if product and product.min_qty else 1 }}">
+    <p class="muted small">Buyers cannot add less than this to their cart (defaults to 1).</p>
+
+    <button class="btn full" type="submit">Save listing</button>
+  </form>
+</div>
+{% endblock %}

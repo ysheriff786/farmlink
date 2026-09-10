@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit Product' if product else 'Add Product' }} - FarmLink{% endblock %}
+{% block content %}
+<div class="form-card wide">
+  <h2>{{ 'Edit Product' if product else 'Add a new product' }}</h2>
+  <form method="post" enctype="multipart/form-data">
+    <label for="name">Product name</label>
+    <input id="name" name="name" type="text" required maxlength="120"
+           value="{{ product.name if product else '' }}">
+
+    <label for="description">Description (optional)</label>
+    <textarea id="description" name="description" rows="3">{{ product.description if product else '' }}</textarea>
+
+    <div class="row">
+      <div>
+        <label for="price">Price (₹)</label>
+        <input id="price" name="price" type="number" step="0.01" min="0.01" required
+               value="{{ product.price if product else '' }}">
+      </div>
+      <div>
+        <label for="stock">Stock quantity</label>
+        <input id="stock" name="stock" type="number" min="0" required
+               value="{{ product.stock if product else '' }}">
+      </div>
+    </div>
+
+    <label for="unit">Unit</label>
+    <select id="unit" name="unit">
+      {% for u in units %}
+      <option value="{{ u }}" {{ 'selected' if product and product.unit == u }}>{{ u }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="image">Product photo {% if product and product.image %}(replace current){% endif %}</label>
+    <input id="image" name="image" type="file" accept=".jpg,.jpeg,.png,.webp">
+    <p class="muted small">JPG, PNG or WebP up to 5 MB.</p>
+
+    <button class="btn full" type="submit">Save Product</button>
+  </form>
+</div>
+{% endblock %}

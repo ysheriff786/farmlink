@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{% if vehicle %}Edit Vehicle{% else %}Add Vehicle{% endif %} - FarmLink{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h2>{% if vehicle %}Edit Vehicle{% else %}Add Vehicle{% endif %}</h2>
+  <div class="head-actions">
+    <a class="btn small outline" href="{{ url_for('logistics_dashboard') }}">Back to Dashboard</a>
+  </div>
+</div>
+
+<div class="card panel form-card" style="max-width: 560px;">
+  <form method="post">
+    <label for="vehicle_type">Vehicle type</label>
+    <select id="vehicle_type" name="vehicle_type" required>
+      {% for t in ['Bike','Auto','Van','Truck','Mini Truck','Container','Other'] %}
+      <option value="{{ t }}" {{ 'selected' if vehicle and vehicle.vehicle_type == t }}>{{ t }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="registration_number">Registration number</label>
+    <input id="registration_number" name="registration_number" value="{{ vehicle.registration_number if vehicle else '' }}" placeholder="e.g. KA-01-AB-1234">
+
+    <label for="driver_name">Driver name</label>
+    <input id="driver_name" name="driver_name" value="{{ vehicle.driver_name if vehicle else '' }}">
+
+    <label for="driver_phone">Driver phone</label>
+    <input id="driver_phone" name="driver_phone" value="{{ vehicle.driver_phone if vehicle else '' }}" pattern="[0-9]{10}">
+
+    <label for="capacity_kg">Capacity (kg)</label>
+    <input id="capacity_kg" name="capacity_kg" type="number" min="1" step="any" value="{{ vehicle.capacity_kg if vehicle else '' }}" required>
+
+    {% if vehicle %}
+    <label class="check-row">
+      <input type="checkbox" name="is_available" {% if vehicle.is_available %}checked{% endif %}>
+      Available for deliveries
+    </label>
+    {% endif %}
+
+    <button type="submit" class="btn full">{% if vehicle %}Save Changes{% else %}Add Vehicle{% endif %}</button>
+  </form>
+</div>
+{% endblock %}

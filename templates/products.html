@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Products - FarmLink{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h2>{{ 'Products' if not cat else cat }}</h2>
+  {% if current_user and current_user.role in ['farmer', 'fpo'] %}
+    <a class="btn small" href="{{ url_for('product_new') }}">+ Add Product</a>
+  {% endif %}
+</div>
+
+<div class="chip-bar">
+  <a class="chip {{ 'on' if not cat }}" href="{{ url_for('products') }}{% if q %}?q={{ q|urlencode }}{% endif %}">All</a>
+  {% for c in categories %}
+    <a class="chip {{ 'on' if cat == c.name }}" href="{{ url_for('products', cat=c.name) }}{% if q %}?q={{ q|urlencode }}{% endif %}">{{ c.name }}</a>
+  {% endfor %}
+</div>
+
+<div class="grid">
+  {% for p in products %}
+  <div class="card product-card">
+    <div class="product-img">
+      {% if p.image %}<img src="{{ url_for('static', filename='uploads/' ~ p.image) }}" alt="{{ p.name }}">
+      {% else %}<span>{{ p.name[0]|upper }}</span>{% endif %}
+      {% if p.stock <= 0 %}<span class="out-badge">Out of stock</span>{% endif %}
+    </div>
+    <div class="card-body">
+      <h3>{{ p.name }}
+        {% if p.is_aggregate %}<span class="badge aggregate">FPO supply</span>{% endif %}
+      </h3>
+      <p class="muted">by {{ p.farmer_name }}</p>
+      {% if p.description %}<p class="desc">{{ p.description|truncate(80) }}</p>{% endif %}
+      <p class="price">{{ p.price|money }} <small>/ {{ p.unit }}</small></p>
+      <p class="muted small">In stock: {{ p.stock }} {{ p.unit }}
+        {% if p.min_qty and p.min_qty > 1 %}<span class="min-qty-chip">min {{ p.min_qty|int }} {{ p.unit }}</span>{% endif %}
+      </p>
+
+      {% if current_user and current_user.role in ['customer', 'bulk_buyer'] and p.stock > 0 %}
+      <form class="add-form" method="post" action="{{ url_for('cart_add', pid=p.id) }}">
+        <input type="number" name="quantity" value="{{ p.min_qty if p.min_qty and p.min_qty > 1 else 1 }}" min="{{ p.min_qty|int }}" max="{{ p.stock }}">
+        <button class="btn small" type="submit">Add to Cart</button>
+      </form>
+      {% endif %}
+
+      {% if current_user and current_user.role in ['farmer', 'fpo'] and current_user.id == p.farmer_id %}
+      <div class="owner-actions">
+        <a class="btn small outline" href="{{ url_for('product_edit', pid=p.id) }}">Edit</a>
+        <form method="post" action="{{ url_for('product_delete', pid=p.id) }}"
+              onsubmit="return confirm('Delete this product?')">
+          <button class="btn small danger" type="submit">Delete</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <p class="muted">No products yet.</p>
+  {% endfor %}
+</div>
+{% endblock %}

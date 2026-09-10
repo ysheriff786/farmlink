@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Supply Chain Intelligence Center - FarmLink{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h2>Supply Chain Intelligence Center</h2>
+  <div class="head-actions">
+    <a class="btn small outline" href="{{ url_for('admin') }}">Admin Panel</a>
+  </div>
+</div>
+
+<div class="stats dash-stats">
+  <div class="stat"><span class="stat-num">{{ analytics.total_users }}</span><small>Total users</small></div>
+  <div class="stat"><span class="stat-num">{{ analytics.products }}</span><small>Products</small></div>
+  <div class="stat"><span class="stat-num">{{ analytics.total_orders }}</span><small>Orders</small></div>
+  <div class="stat"><span class="stat-num">₹{{ '%.0f'|format(analytics.total_revenue) }}</span><small>Total revenue</small></div>
+</div>
+
+<div class="dash-grid">
+  <div class="card panel">
+    <h3>1. Supply Overview</h3>
+    <table class="table plain-table">
+      <tr><th>Active farmers</th><td>{{ analytics.role_counts.get('farmer', 0) }}</td></tr>
+      <tr><th>Active FPOs</th><td>{{ analytics.role_counts.get('fpo', 0) }}</td></tr>
+      <tr><th>Available supply</th><td>{{ '%.0f'|format(analytics.supply_kg) }} kg</td></tr>
+      <tr><th>Aggregate supplies</th><td>{{ analytics.aggregate_supplies }}</td></tr>
+      <tr><th>Verified logistics</th><td>{{ analytics.logistics_partners }}</td></tr>
+    </table>
+  </div>
+
+  <div class="card panel">
+    <h3>2. Demand</h3>
+    <table class="table plain-table">
+      <tr><th>Total demand (7d)</th><td>{{ '%.0f'|format(analytics.total_revenue) }} units</td></tr>
+      <tr><th>Open requirements</th><td>{{ analytics.open_requirements }}</td></tr>
+      <tr><th>Awarded requirements</th><td>{{ analytics.awarded_requirements }}</td></tr>
+      <tr><th>Supply–demand status</th><td><a href="{{ url_for('admin_demand') }}">View forecast analytics →</a></td></tr>
+    </table>
+  </div>
+
+  <div class="card panel">
+    <h3>3. Smart Matching</h3>
+    <table class="table plain-table">
+      <tr><th>Bulk requirements</th><td>{{ analytics.bulk_requirements }}</td></tr>
+      <tr><th>Open requirements</th><td>{{ analytics.open_requirements }}</td></tr>
+      <tr><th>Awarded</th><td>{{ analytics.awarded_requirements }}</td></tr>
+    </table>
+    <p class="muted small">Open requirements awaiting supplier quotes can be managed in the <a href="{{ url_for('admin') }}">admin panel</a>.</p>
+  </div>
+
+  <div class="card panel">
+    <h3>4. Logistics</h3>
+    <table class="table plain-table">
+      <tr><th>Total deliveries</th><td>{{ analytics.total_deliveries }}</td></tr>
+      <tr><th>In transit</th><td>{{ analytics.in_transit }}</td></tr>
+      <tr><th>Delivered</th><td>{{ analytics.delivered }}</td></tr>
+      <tr><th>Pending verifications</th><td>{{ analytics.pending_verifications }}</td></tr>
+    </table>
+    <a class="btn small" href="{{ url_for('admin_logistics') }}">Manage logistics →</a>
+  </div>
+
+  <div class="card panel">
+    <h3>5. Route Intelligence</h3>
+    <p><strong>Active deliveries:</strong> {{ deliveries|length }}</p>
+    {% if deliveries %}
+    <table class="table plain-table">
+      <tr><th>#</th><th>Status</th><th>Via</th></tr>
+      {% for d in deliveries[:8] %}
+      <tr>
+        <td>#{{ d.id }}</td>
+        <td><span class="status-badge {{ d.status|status_class }}">{{ d.status }}</span></td>
+        <td>{{ d.pickup_city or '-' }} → {{ d.destination_city or '-' }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted">No active deliveries.</p>
+    {% endif %}
+    <a class="btn small mt" href="{{ url_for('route_optimizer_page') }}">Open Route Optimizer →</a>
+  </div>
+
+  <div class="card panel">
+    <h3>6. Farmer Impact</h3>
+    <table class="table plain-table">
+      <tr><th>Farmer revenue</th><td>₹{{ '%.0f'|format(analytics.total_revenue) }}</td></tr>
+      <tr><th>Platform fees</th><td>₹{{ '%.0f'|format(analytics.platform_fees) }}</td></tr>
+      <tr><th>Bulk buyers</th><td>{{ analytics.role_counts.get('bulk_buyer', 0) }}</td></tr>
+    </table>
+    {% if analytics.farmer_revenue_breakdown %}
+    <h4 class="mt">Top farmers by revenue</h4>
+    <table class="table plain-table">
+      <tr><th>Farm</th><th>Revenue</th><th>Buyers</th></tr>
+      {% for f in analytics.farmer_revenue_breakdown[:5] %}
+      <tr>
+        <td>{{ f.name }}</td>
+        <td>₹{{ '%.0f'|format(f.revenue) }}</td>
+        <td>{{ f.buyers }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+  </div>
+</div>
+
+<h3 class="mt">7. Smart Alerts</h3>
+<div class="card panel">
+  {% if alerts %}
+  <div class="table-scroll">
+    <table class="table">
+      <tr><th>Severity</th><th>Alert</th><th>Details</th></tr>
+      {% for a in alerts %}
+      <tr>
+        <td><span class="status-badge {{ 'bad' if a.severity == 'high' else 'warn' }}">{{ a.severity }}</span></td>
+        <td>{{ a.title }}</td>
+        <td>{{ a.message }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">No active alerts. System healthy.</p>
+  {% endif %}
+</div>
+
+<h3 class="mt">8. Demand Forecasts</h3>
+<div class="card panel">
+  {% if forecasts %}
+  <div class="table-scroll">
+    <table class="table">
+      <tr><th>Product</th><th>7-day forecast</th><th>Daily avg</th><th>Trend</th><th>Confidence</th></tr>
+      {% for f in forecasts[:12] %}
+      <tr>
+        <td>{{ f.product }}</td>
+        <td>{{ '%.1f'|format(f.total_forecast or 0) }}</td>
+        <td>{{ '%.1f'|format(f.historical_demand.daily_avg or 0) }}</td>
+        <td><span class="status-badge {{ 'done' if f.trend == 'Increasing' else 'bad' if f.trend == 'Decreasing' else 'info' }}">{{ f.trend }}</span></td>
+        <td>{% if f.confidence and f.confidence.score %}{{ f.confidence.score }}/100{% else %}n/a{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">Insufficient historical data for reliable forecasts.</p>
+  {% endif %}
+</div>
+
+<h3 class="mt">9. Supply Chain Map</h3>
+<div id="intelligenceMap" style="height: 450px; border-radius: 10px;"></div>
+
+<style>
+  .mt { margin-top: 18px; }
+</style>
+{% endblock %}
+{% block scripts %}
+<script>
+  var map = L.map('intelligenceMap').setView([22.0, 79.0], 5);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+
+  fetch('{{ url_for("api_map_data") }}')
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      var pts = [];
+      d.entities.forEach(function (e) {
+        if (e.type === 'delivery') {
+          if (e.pickup_lat && e.dest_lat) {
+            L.polyline([[e.pickup_lat, e.pickup_lng], [e.dest_lat, e.dest_lng]], { color: '#7b1fa2', weight: 2, dashArray: '4,6' }).addTo(map);
+            pts.push([e.pickup_lat, e.pickup_lng], [e.dest_lat, e.dest_lng]);
+          }
+          return;
+        }
+        var emoji = e.type === 'farmer' ? '🧑‍🌾' : e.type === 'fpo' ? '🏢' : e.type === 'buyer' ? '🛒' : '🚚';
+        var color = e.type === 'farmer' ? '#2e7d32' : e.type === 'fpo' ? '#1565c0' : e.type === 'buyer' ? '#f57c00' : '#6a1b9a';
+        var m = L.marker([e.lat, e.lng], { icon: L.divIcon({ html: '<div style="font-size:18px;color:' + color + '">' + emoji + '</div>', className: '' }) })
+          .bindPopup('<strong>' + e.name + '</strong><br>' + (e.city || ''));
+        m.addTo(map);
+        pts.push([e.lat, e.lng]);
+      });
+      if (pts.length > 1) {
+        try { map.fitBounds(L.latLngBounds(pts)); } catch (err) {}
+      }
+    })
+    .catch(function () {});
+</script>
+{% endblock %}

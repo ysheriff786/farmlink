@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}My Profile - FarmLink{% endblock %}
+{% block content %}
+<div class="form-card">
+  <h2>My profile</h2>
+  <p class="muted">Signed in as {{ current_user.email }} ({{ current_user.role }})</p>
+  <form method="post">
+    <label for="name">Full name</label>
+    <input id="name" name="name" type="text" required maxlength="120" value="{{ current_user.name }}">
+
+    <label for="phone">Phone number</label>
+    <input id="phone" name="phone" type="tel" pattern="[0-9]{10}" placeholder="10-digit mobile number"
+           value="{{ current_user.phone or '' }}">
+
+    <label for="address">Default delivery address</label>
+    <textarea id="address" name="address" rows="3"
+              placeholder="House no, street, village/town, district, pincode">{{ current_user.address or '' }}</textarea>
+
+    <label for="new_password">New password (leave blank to keep current)</label>
+    <input id="new_password" name="new_password" type="password" minlength="6">
+
+    <button class="btn full" type="submit">Save changes</button>
+  </form>
+</div>
+{% endblock %}

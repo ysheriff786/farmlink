@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Register - FarmLink{% endblock %}
+{% block content %}
+<div class="form-card">
+  <h2>Create your account</h2>
+  <form method="post" id="register-form">
+    <label for="name">Full name</label>
+    <input id="name" name="name" type="text" required maxlength="120">
+
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required maxlength="120">
+
+    <label for="phone">Phone number</label>
+    <input id="phone" name="phone" type="tel" pattern="[0-9]{10}" placeholder="10-digit mobile number">
+
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" required minlength="6">
+
+    <fieldset class="role-group">
+      <legend>I am a...</legend>
+      <label class="radio"><input type="radio" name="role" value="farmer" checked> Farmer - I want to sell produce</label>
+      <label class="radio"><input type="radio" name="role" value="fpo"> FPO - I represent a group of farmers</label>
+      <label class="radio"><input type="radio" name="role" value="customer"> Customer - I want to buy produce</label>
+      <label class="radio"><input type="radio" name="role" value="bulk_buyer"> Bulk buyer - I buy in large volumes</label>
+      <label class="radio"><input type="radio" name="role" value="logistics"> Logistics partner - I deliver produce</label>
+    </fieldset>
+
+    <div class="role-section" id="org-section">
+      <label for="contact_person">Contact person <span class="req">*</span></label>
+      <input id="contact_person" name="contact_person" type="text" maxlength="120">
+
+      <label for="city">City <span class="req">*</span></label>
+      <input id="city" name="city" type="text" maxlength="80">
+
+      <label for="state">State <span class="req">*</span></label>
+      <input id="state" name="state" type="text" maxlength="80">
+
+      <label for="pincode">Pincode <span class="req">*</span></label>
+      <input id="pincode" name="pincode" type="text" pattern="[0-9]{6}" maxlength="10" placeholder="6-digit pincode">
+
+      <label for="address">Address</label>
+      <input id="address" name="address" type="text" maxlength="200">
+
+      <label for="latitude">Latitude (optional)</label>
+      <input id="latitude" name="latitude" type="number" step="any" placeholder="e.g. 20.5937">
+
+      <label for="longitude">Longitude (optional)</label>
+      <input id="longitude" name="longitude" type="number" step="any" placeholder="e.g. 78.9629">
+
+      <div class="role-section" id="fpo-section">
+        <label for="registration_id">FPO registration ID <span class="req">*</span></label>
+        <input id="registration_id" name="registration_id" type="text" maxlength="80">
+
+        <label for="member_count">Number of farmer members</label>
+        <input id="member_count" name="member_count" type="number" min="0" value="0">
+
+        <label for="main_crops">Main crops / produce</label>
+        <input id="main_crops" name="main_crops" type="text" maxlength="200">
+
+        <label for="description">About your FPO</label>
+        <textarea id="description" name="description" rows="3" maxlength="600"></textarea>
+      </div>
+
+      <div class="role-section" id="bulk-section">
+        <label for="buyer_type">Buyer type</label>
+        <select id="buyer_type" name="buyer_type">
+          <option value="">Choose a type...</option>
+          <option value="Hotel">Hotel</option>
+          <option value="Restaurant">Restaurant</option>
+          <option value="Retailer">Retailer</option>
+          <option value="Supermarket">Supermarket</option>
+          <option value="Food Processor">Food Processor</option>
+          <option value="Institution">Institution</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+
+      <div class="role-section" id="logistics-section">
+        <label for="company_name">Company name <span class="req">*</span></label>
+        <input id="company_name" name="company_name" type="text" maxlength="120">
+
+        <label for="license_number">Transport license / registration number</label>
+        <input id="license_number" name="license_number" type="text" maxlength="80">
+      </div>
+    </div>
+
+    <button class="btn full" type="submit">Register</button>
+  </form>
+  <p class="muted center">Already have an account? <a href="{{ url_for('login') }}">Login</a></p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  (function () {
+    var org = document.getElementById("org-section");
+    var fpo = document.getElementById("fpo-section");
+    var bulk = document.getElementById("bulk-section");
+    var logistics = document.getElementById("logistics-section");
+    var phone = document.getElementById("phone");
+    function toggle() {
+      var role = (document.querySelector('input[name="role"]:checked') || {}).value || "farmer";
+      var showOrg = role === "fpo" || role === "bulk_buyer" || role === "logistics";
+      org.hidden = !showOrg;
+      fpo.hidden = role !== "fpo";
+      bulk.hidden = role !== "bulk_buyer";
+      logistics.hidden = role !== "logistics";
+      phone.required = showOrg;
+      ["contact_person", "city", "state", "pincode"].forEach(function (id) {
+        document.getElementById(id).required = showOrg;
+      });
+      document.getElementById("registration_id").required = role === "fpo";
+      document.getElementById("buyer_type").required = role === "bulk_buyer";
+      document.getElementById("company_name").required = role === "logistics";
+    }
+    document.querySelectorAll('input[name="role"]').forEach(function (r) {
+      r.addEventListener("change", toggle);
+    });
+    toggle();
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+{% block title %}FPO Dashboard - FarmLink{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h2>FPO Dashboard</h2>
+  <span class="muted">{{ current_user.name }} &middot; {{ profile.registration_id or 'Not yet registered' }}</span>
+</div>
+
+{% if profile and profile.verification_status != 'verified' %}
+<div class="flash warn">
+  Your FPO profile is <strong>{{ profile.verification_status }}</strong>. An admin reviews FPO accounts
+  before they appear in the verified directory and can transact as an organisation.
+</div>
+{% endif %}
+
+<nav class="dash-tabs">
+  <a class="dash-tab {{ 'on' if tab == 'overview' }}" href="{{ url_for('fpo_dashboard', tab='overview') }}">Overview</a>
+  <a class="dash-tab {{ 'on' if tab == 'products' }}" href="{{ url_for('fpo_dashboard', tab='products') }}">Products</a>
+  <a class="dash-tab {{ 'on' if tab == 'supply' }}" href="{{ url_for('fpo_dashboard', tab='supply') }}">Supply pool</a>
+  <a class="dash-tab {{ 'on' if tab == 'members' }}" href="{{ url_for('fpo_dashboard', tab='members') }}">Members</a>
+  <a class="dash-tab {{ 'on' if tab == 'requests' }}" href="{{ url_for('fpo_dashboard', tab='requests') }}">Bulk requests</a>
+  <a class="dash-tab {{ 'on' if tab == 'quotes' }}" href="{{ url_for('fpo_dashboard', tab='quotes') }}">My quotes</a>
+  <a class="dash-tab {{ 'on' if tab == 'orders' }}" href="{{ url_for('fpo_dashboard', tab='orders') }}">Bulk orders</a>
+  <a class="dash-tab {{ 'on' if tab == 'sales' }}" href="{{ url_for('fpo_dashboard', tab='sales') }}">Sales</a>
+  <a class="dash-tab {{ 'on' if tab == 'profile' }}" href="{{ url_for('fpo_dashboard', tab='profile') }}">Profile</a>
+</nav>
+
+{% if tab == 'overview' %}
+<div class="stats dash-stats">
+  <div class="stat"><span class="stat-num">{{ stats.agg_available }}<small>kg</small></span><small>Available aggregate supply</small></div>
+  <div class="stat"><span class="stat-num">{{ stats.agg_committed }}<small>kg</small></span><small>Committed to active bulk orders</small></div>
+  <div class="stat"><span class="stat-num">{{ stats.agg_pending_quotes }}</span><small>Pending quotes</small></div>
+  <div class="stat"><span class="stat-num">{{ stats.bulk_orders }}</span><small>Active bulk orders</small></div>
+  <div class="stat"><span class="stat-num">{{ stats.open_reqs }}</span><small>Open bulk requests</small></div>
+  <div class="stat"><span class="stat-num">{{ stats.members }}</span><small>Farmer members</small></div>
+</div>
+<div class="dash-grid">
+  <div class="card panel">
+    <h3>Getting started</h3>
+    <ul class="plain-list">
+      <li>1. List your produce on the <a href="{{ url_for('fpo_dashboard', tab='products') }}">Products</a> tab.</li>
+      <li>2. Add the farmers you represent on the <a href="{{ url_for('fpo_dashboard', tab='members') }}">Members</a> tab.</li>
+      <li>2b. Pool member produce into a buyable <a href="{{ url_for('fpo_dashboard', tab='supply') }}">aggregate supply</a> listing.</li>
+      <li>3. Quote on <a href="{{ url_for('fpo_dashboard', tab='requests') }}">bulk requests</a> from hotels, restaurants and retailers.</li>
+      <li>4. Track delivery and sales on the <a href="{{ url_for('fpo_dashboard', tab='orders') }}">Bulk orders</a> and <a href="{{ url_for('fpo_dashboard', tab='sales') }}">Sales</a> tabs.</li>
+    </ul>
+  </div>
+  <div class="card panel">
+    <h3>Verification</h3>
+    <p>Bulk buyers see only <strong>verified</strong> FPOs in their supplier directory.
+       <span class="status-badge {{ profile.verification_status|verif_class }}">{{ profile.verification_status }}</span></p>
+    <p class="muted small">Contact <a href="{{ url_for('page', slug='contact') }}">support</a> if you have been waiting
+       for more than a few days.</p>
+  </div>
+</div>
+
+{% elif tab == 'products' %}
+<div class="page-head">
+  <h3>Your products</h3>
+  <a class="btn small" href="{{ url_for('product_new') }}">+ Add Product</a>
+</div>
+{% if products %}
+<table class="table">
+  <thead><tr><th>Product</th><th>Price</th><th>Stock</th><th></th></tr></thead>
+  <tbody>
+    {% for p in products %}
+    <tr>
+      <td><a href="{{ url_for('product_detail', pid=p.id) }}">{{ p.name }}</a></td>
+      <td>{{ p.price|money }} / {{ p.unit }}</td>
+      <td>{{ p.stock }}</td>
+      <td class="row-actions">
+        <a class="btn small outline" href="{{ url_for('product_edit', pid=p.id) }}">Edit</a>
+        <form method="post" action="{{ url_for('product_delete', pid=p.id) }}"
+              onsubmit="return confirm('Delete this product?')">
+          <button class="btn small danger" type="submit">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No products yet. <a href="{{ url_for('product_new') }}">Add your first product</a> to start selling.</p>
+{% endif %}
+
+{% elif tab == 'supply' %}
+<div class="page-head">
+  <h3>Aggregate supply pool</h3>
+  <a class="btn small" href="{{ url_for('fpo_supply_new') }}">+ New supply listing</a>
+</div>
+<p class="muted small">Pool committed quantities from member farmers into a single buyable listing.
+  Member farmers' own sales automatically shrink the on-hand volume, so you can never oversell.</p>
+{% if supplies %}
+<table class="table">
+  <thead><tr><th>Listing</th><th>Price</th><th>On hand</th><th>Sources</th><th>Min order</th><th></th></tr></thead>
+  <tbody>
+    {% for s in supplies %}
+    <tr>
+      <td><a href="{{ url_for('fpo_supply_detail', sid=s.id) }}">{{ s.name }}</a></td>
+      <td>{{ s.price|money }} / {{ s.unit }}</td>
+      <td>{{ s.on_hand }} {{ s.unit }}</td>
+      <td>{{ s.sources }} farmer product{% if s.sources != 1 %}s{% endif %}</td>
+      <td>{{ s.min_qty|int }}</td>
+      <td class="row-actions">
+        <a class="btn small outline" href="{{ url_for('fpo_supply_detail', sid=s.id) }}">Manage</a>
+        <form method="post" action="{{ url_for('fpo_supply_delete', sid=s.id) }}"
+              onsubmit="return confirm('Delete this supply listing? Allocations will be removed.')">
+          <button class="btn small danger" type="submit">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No aggregate supply yet. <a href="{{ url_for('fpo_supply_new') }}">Create a listing</a>,
+   then add member-farmer allocations to start pooling.</p>
+{% endif %}
+
+{% elif tab == 'members' %}
+<div class="dash-grid reverse">
+  <div class="card panel">
+    <h3>Farmer members ({{ members_rows|length }})</h3>
+    {% if members_rows %}
+    <table class="table plain-table">
+      <tr><th>Name</th><th>Email</th><th>Phone</th><th></th></tr>
+      {% for m in members_rows %}
+      <tr>
+        <td>{{ m.name }}</td>
+        <td>{{ m.email }}</td>
+        <td>{{ m.phone or '-' }}</td>
+        <td>
+          <form method="post" action="{{ url_for('fpo_member_remove', mid=m.id) }}"
+                onsubmit="return confirm('Remove this farmer from your FPO?')">
+            <button class="btn small danger" type="submit">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted">No members yet. Add farmers you represent below.</p>
+    {% endif %}
+  </div>
+  <div class="card panel">
+    <h3>Add a farmer</h3>
+    {% if available_farmers %}
+    <form method="post" action="{{ url_for('fpo_member_add') }}">
+      <label for="farmer_id">Select a registered farmer</label>
+      <select id="farmer_id" name="farmer_id" required>
+        <option value="">Choose a farmer…</option>
+        {% for f in available_farmers %}
+        <option value="{{ f.id }}">{{ f.name }} ({{ f.city or f.email }})</option>
+        {% endfor %}
+      </select>
+      <button class="btn full" type="submit">Add member</button>
+    </form>
+    {% else %}
+    <p class="muted">All farmers are already in your FPO.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% elif tab == 'requests' %}
+<div class="dash-grid">
+  <div class="card panel">
+    <h3>Open bulk requests (marketplace)</h3>
+    {% if requirements %}
+    <table class="table">
+      <thead><tr><th>Requirement</th><th>Buyer</th><th>Qty</th><th>Your supply</th><th>Target</th><th>Quotes</th><th></th></tr></thead>
+      <tbody>
+        {% for r in requirements %}
+        <tr>
+          <td><strong>{{ r.title }}</strong><br><span class="muted small">{{ r.category }}</span>
+              {% if r.description %}<div class="muted small">{{ r.description|truncate(90) }}</div>{% endif %}
+              <div class="muted small">
+                {% if r.match_status == 'complete' %}
+                <span style="color:#16a34a">✓ Can fulfill completely</span>
+                {% elif r.match_status == 'partial' %}
+                <span style="color:#d97706">⚠ Partial fulfillment</span>
+                {% else %}
+                <span class="muted">✗ No matching supply</span>
+                {% endif %}
+              </div></td>
+          <td>{{ r.buyer_name }}<br><span class="muted small">{{ r.city or '-' }}</span></td>
+          <td>{{ r.quantity }} {{ r.unit }}</td>
+          <td>
+            {{ r.match_total }} {{ r.unit }}
+            {% if r.matches %}
+            <div class="muted small">
+              {% for m in r.matches %}
+              <div>{{ m.name }}: {{ m.on_hand }} {{ m.unit }}</div>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </td>
+          <td>{{ r.target_price|money if r.target_price else '-' }}</td>
+          <td>{{ r.my_quotes }} / {{ r.quote_count }}</td>
+          <td>
+            {% if r.my_quotes %}
+            <span class="status-badge info">Quoted</span>
+            {% elif not r.matches %}
+            <span class="muted small">No matching supply to quote from</span>
+            {% else %}
+            <form method="post" action="{{ url_for('fpo_quote_new', rid=r.id) }}" class="stack-form">
+              <select name="supply_id" required>
+                <option value="">Choose supply…</option>
+                {% for m in r.matches %}
+                <option value="{{ m.id }}">{{ m.name }} ({{ m.on_hand }} {{ m.unit }})</option>
+                {% endfor %}
+              </select>
+              <input type="number" name="quantity" placeholder="Quote qty (max …)" step="any"
+                     min="0.01" max="{{ [r.quantity, r.match_total]|min }}" required>
+              <input type="number" name="price" placeholder="₹ per unit" step="0.01" min="0.01" required>
+              <input type="text" name="notes" placeholder="Notes (optional)" maxlength="200">
+              <button class="btn small" type="submit">Submit quote</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">No open bulk requests right now. Check back later.</p>
+    {% endif %}
+  </div>
+  <div class="card panel">
+    <h3>My aggregate supply</h3>
+    <p class="muted small">Available volumes you can promise against a request.</p>
+    {% if my_supply %}
+    <table class="table plain-table">
+      <tr><th>Listing</th><th>On hand</th></tr>
+      {% for s in my_supply %}
+      <tr>
+        <td><a href="{{ url_for('fpo_supply_detail', sid=s.id) }}">{{ s.name }}</a></td>
+        <td>{{ s.on_hand }} {{ s.unit }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted">No aggregate supply yet. <a href="{{ url_for('fpo_dashboard', tab='supply') }}">Create one</a>
+       so buyers can see consistent availability.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% elif tab == 'quotes' %}
+<div class="page-head">
+  <h3>Your quotes</h3>
+</div>
+{% if quotes %}
+<table class="table">
+  <thead><tr><th>Requirement</th><th>Buyer</th><th>Your quote</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+    {% for q in quotes %}
+    <tr>
+      <td>{{ q.title }}<br><span class="muted small">{{ q.req_qty }} {{ q.unit }}</span></td>
+      <td>{{ q.buyer_name }}</td>
+      <td>{{ q.price|money }} x {{ q.quantity }} = {{ (q.price * q.quantity)|money }}</td>
+      <td><span class="status-badge {{ q.status|status_class }}">{{ q.status }}</span></td>
+      <td>
+        {% if q.status == 'Pending' %}
+        <form method="post" action="{{ url_for('fpo_quote_cancel', qid=q.id) }}">
+          <button class="btn small danger" type="submit">Withdraw</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">You haven't submitted any quotes yet.</p>
+{% endif %}
+
+{% elif tab == 'orders' %}
+<div class="page-head">
+  <h3>Bulk orders</h3>
+</div>
+{% if bulk_orders %}
+<table class="table">
+  <thead><tr><th>#</th><th>Requirement</th><th>Buyer</th><th>Qty x Price</th><th>Total</th><th>Source</th><th>Status</th><th>Date</th></tr></thead>
+  <tbody>
+    {% for b in bulk_orders %}
+    <tr>
+      <td>#{{ b.id }}</td>
+      <td>{{ b.title }}</td>
+      <td>{{ b.buyer_name }}<br><span class="muted small">{{ b.delivery_address }}</span></td>
+      <td>{{ b.quantity }} x {{ b.price|money }}</td>
+      <td>{{ b.total|money }}</td>
+      <td>
+        {% if b.supply_name %}
+          <strong>{{ b.supply_name }}</strong>
+          {% if b.sources %}
+          <div class="muted small">
+            {% for s in b.sources %}
+            <div>{{ s.farmer_name }} · {{ s.product_name }}: {{ s.qty }} {{ b.supply_unit or '' }}</div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="muted small">No consumption rows</div>
+          {% endif %}
+        {% else %}
+        <span class="muted">Not supply-backed</span>
+        {% endif %}
+      </td>
+      <td><span class="status-badge {{ b.status|status_class }}">{{ b.status }}</span></td>
+      <td>{{ b.created_at|datefmt }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No bulk orders yet. Quote on requests to win orders.</p>
+{% endif %}
+
+{% elif tab == 'sales' %}
+<div class="stats dash-stats">
+  <div class="stat"><span class="stat-num">₹{{ '%.0f'|format(totals.revenue) }}</span><small>Total earnings</small></div>
+  <div class="stat"><span class="stat-num">₹{{ '%.0f'|format(month_rev) }}</span><small>This month</small></div>
+  <div class="stat"><span class="stat-num">{{ totals.orders }}</span><small>Earning orders</small></div>
+  <div class="stat"><span class="stat-num">₹{{ '%.0f'|format(avg_order) }}</span><small>Avg order value</small></div>
+</div>
+<div class="dash-grid">
+  <div class="card panel">
+    <h3>Top products by revenue</h3>
+    {% if top_products %}
+    <table class="table plain-table">
+      <tr><th>Product</th><th>Qty sold</th><th>Revenue</th></tr>
+      {% for t in top_products %}
+      <tr><td>{{ t.product_name }}</td><td>{{ t.qty }}</td><td>{{ t.rev|money }}</td></tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted">No sales yet.</p>
+    {% endif %}
+  </div>
+  <div class="card panel">
+    <h3>Recent marketplace orders</h3>
+    {% if recent_orders %}
+    <table class="table plain-table">
+      <tr><th>#</th><th>Buyer</th><th>Status</th><th>Total</th></tr>
+      {% for g in recent_orders %}
+      <tr>
+        <td>#{{ g.order_id }}</td>
+        <td>{{ g.buyer_name }}</td>
+        <td><span class="status-badge {{ g.status|status_class }}">{{ g.status }}</span></td>
+        <td>{{ g.total|money }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted">No orders yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% elif tab == 'profile' %}
+<div class="card panel profile-card">
+  <h3>FPO profile
+    <span class="status-badge {{ profile.verification_status|verif_class }}">{{ profile.verification_status }}</span>
+  </h3>
+  <p><strong>Organisation:</strong> {{ current_user.name }}</p>
+  <p><strong>Registration ID:</strong> {{ profile.registration_id or '-' }}</p>
+  <p><strong>Contact person:</strong> {{ profile.contact_person or '-' }} · {{ profile.phone or '-' }}</p>
+  <p><strong>Location:</strong> {{ profile.address or '-' }}, {{ profile.city or '-' }}, {{ profile.state or '-' }} {{ profile.pincode or '' }}</p>
+  <p><strong>Farmer members:</strong> {{ profile.member_count or 0 }}</p>
+  <p><strong>Main crops:</strong> {{ profile.main_crops or '-' }}</p>
+  {% if profile.description %}<p><strong>About:</strong> {{ profile.description }}</p>{% endif %}
+</div>
+{% endif %}
+{% endblock %}
