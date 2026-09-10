@@ -119,7 +119,7 @@
   <div class="card product-card">
     <a href="{{ url_for('product_detail', pid=p.id) }}" class="product-img">
       {% if p.image %}<img src="{{ url_for('static', filename='uploads/' ~ p.image) }}" alt="{{ p.name }}">
-      {% else %}<span>{{ p.name[0]|upper }}</span>{% endif %}
+      {% else %}<img src="{{ url_for('static', filename='vegetables/' ~ veg_placeholder(p)) }}" alt="{{ p.name }}">{% endif %}
     </a>
     <div class="card-body">
       <p class="muted small">{{ p.farmer_name }}</p>

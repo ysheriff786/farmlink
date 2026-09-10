@@ -20,7 +20,7 @@
   <div class="card product-card">
     <div class="product-img">
       {% if p.image %}<img src="{{ url_for('static', filename='uploads/' ~ p.image) }}" alt="{{ p.name }}">
-      {% else %}<span>{{ p.name[0]|upper }}</span>{% endif %}
+      {% else %}<img src="{{ url_for('static', filename='vegetables/' ~ veg_placeholder(p)) }}" alt="{{ p.name }}">{% endif %}
       {% if p.stock <= 0 %}<span class="out-badge">Out of stock</span>{% endif %}
     </div>
     <div class="card-body">

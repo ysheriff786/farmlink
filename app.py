@@ -133,6 +133,31 @@ def current_user():
     return None
 
 
+VEG_PLACEHOLDERS = {
+    "tomato": "tomato.jpg",
+    "onion": "onion.jpg",
+    "spinach": "spinach.jpg",
+    "greens": "spinach.jpg",
+    "egg": "eggs.jpg",
+    "mango": "mango.jpg",
+    "honey": "honey.jpg",
+    "milk": "milk.jpg",
+}
+
+
+def veg_placeholder(product):
+    name = (product.get("name") or "").lower()
+    for key, image in VEG_PLACEHOLDERS.items():
+        if key in name:
+            return image
+    category = (product.get("category") or "").lower()
+    if "dairy" in category:
+        return "milk.jpg"
+    if "fruit" in category or "honey" in category:
+        return "vegmix.jpg"
+    return "vegmix.jpg"
+
+
 @app.context_processor
 def inject_user():
     user = current_user()
@@ -165,7 +190,8 @@ def inject_user():
               query("SELECT category, COUNT(*) AS n FROM products GROUP BY category")}
     categories = [{"name": c, "count": counts.get(c, 0)} for c in CATEGORIES]
     return {"current_user": user, "cart_count": cart_count, "new_orders": new_orders,
-            "categories": categories, "notification_count": notification_count}
+            "categories": categories, "notification_count": notification_count,
+            "veg_placeholder": veg_placeholder}
 
 
 @app.route("/api/order/<int:oid>/status")
