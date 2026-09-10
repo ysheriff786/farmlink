@@ -1,4 +1,4 @@
-# FarmLink 🌾
+# FarmLink 🌾     render link: https://farmlink-kc05.onrender.com
 
 An online marketplace that connects local farmers directly with customers. Farmers list their fresh produce, and customers order it at fair prices — no middlemen. Built with **Python (Flask)** and **SQLite**.
 
@@ -31,8 +31,6 @@ cd farm-market
 pip install -r requirements.txt
 python app.py
 ```
-
-Open http://127.0.0.1:5000 — done. The database is created automatically on first run.
 
 ### Optional: demo data
 
