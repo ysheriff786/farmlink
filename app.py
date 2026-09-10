@@ -111,6 +111,10 @@ def init_db():
         if "username" not in {c["name"] for c in inspector.get_columns("users")}:
             db.session.execute(text("ALTER TABLE users ADD COLUMN username TEXT"))
             db.session.commit()
+        if db.session.execute(text("SELECT COUNT(*) FROM users")).scalar() == 0:
+            import seed
+            import sys
+            print("FarmLink: empty database detected - auto-seeding demo data.", file=sys.stderr)
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
